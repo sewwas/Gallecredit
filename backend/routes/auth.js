@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../db');
+const { sendOTPEmail } = require('../utils/email');
 
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
@@ -36,22 +37,12 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// POST /reset-password - Reset password using a recovery key
-router.post('/reset-password', async (req, res) => {
-  const { username, newPassword, recoveryKey } = req.body;
+// POST /send-otp - Generate & send OTP via email
+router.post('/send-otp', async (req, res) => {
+  const { username } = req.body;
 
-  if (!username || !newPassword || !recoveryKey) {
-    return res.status(400).json({ error: 'All fields (username, newPassword, recoveryKey) are required.' });
-  }
-
-  if (newPassword.length < 6) {
-    return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
-  }
-
-  // Validate the recovery key
-  const expectedKey = process.env.RECOVERY_KEY || 'CreditGalleReset2025';
-  if (recoveryKey !== expectedKey) {
-    return res.status(400).json({ error: 'Invalid security recovery key.' });
+  if (!username) {
+    return res.status(400).json({ error: 'Username (Email) is required.' });
   }
 
   try {
@@ -64,15 +55,77 @@ router.post('/reset-password', async (req, res) => {
     }
 
     if (user.is_active === false) {
-      return res.status(403).json({ error: 'This account is deactivated and cannot be reset.' });
+      return res.status(403).json({ error: 'This account is deactivated.' });
+    }
+
+    // Generate a secure 6-digit OTP code
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Set expiration to 10 minutes from now
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Save OTP to DB
+    await pool.query(
+      'UPDATE users SET reset_otp = $1, reset_otp_expires_at = $2 WHERE username = $3',
+      [otp, expiresAt, username]
+    );
+
+    // Send email
+    const emailResult = await sendOTPEmail(username, otp);
+
+    res.json({
+      message: 'A secure 6-digit recovery code has been sent to your email address.',
+      devOtp: emailResult.development ? otp : null // Provide OTP to frontend ONLY if in dev fallback mode
+    });
+  } catch (err) {
+    console.error('Send OTP error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /reset-password - Reset password using OTP
+router.post('/reset-password', async (req, res) => {
+  const { username, otp, newPassword } = req.body;
+
+  if (!username || !otp || !newPassword) {
+    return res.status(400).json({ error: 'Username, OTP, and newPassword are required.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+  }
+
+  try {
+    // Check user & verify OTP
+    const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const user = userResult.rows[0];
+
+    if (!user) {
+      return res.status(404).json({ error: 'No user account found.' });
+    }
+
+    if (user.is_active === false) {
+      return res.status(403).json({ error: 'This account is deactivated.' });
+    }
+
+    if (!user.reset_otp || user.reset_otp !== otp.toString().trim()) {
+      return res.status(400).json({ error: 'Invalid verification OTP code. Please try again.' });
+    }
+
+    const expiresAt = new Date(user.reset_otp_expires_at);
+    if (expiresAt < new Date()) {
+      return res.status(400).json({ error: 'The verification OTP code has expired. Please request a new code.' });
     }
 
     // Hash the new password
     const saltRounds = 10;
     const newHash = await bcrypt.hash(newPassword, saltRounds);
 
-    // Update password in DB
-    await pool.query('UPDATE users SET password_hash = $1 WHERE username = $2', [newHash, username]);
+    // Update password and clear OTP
+    await pool.query(
+      'UPDATE users SET password_hash = $1, reset_otp = NULL, reset_otp_expires_at = NULL WHERE username = $2',
+      [newHash, username]
+    );
 
     res.json({ message: 'Password reset successful! You can now log in with your new password.' });
   } catch (err) {
@@ -82,4 +135,5 @@ router.post('/reset-password', async (req, res) => {
 });
 
 module.exports = router;
+
 
