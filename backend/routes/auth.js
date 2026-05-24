@@ -36,4 +36,50 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /reset-password - Reset password using a recovery key
+router.post('/reset-password', async (req, res) => {
+  const { username, newPassword, recoveryKey } = req.body;
+
+  if (!username || !newPassword || !recoveryKey) {
+    return res.status(400).json({ error: 'All fields (username, newPassword, recoveryKey) are required.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+  }
+
+  // Validate the recovery key
+  const expectedKey = process.env.RECOVERY_KEY || 'CreditGalleReset2025';
+  if (recoveryKey !== expectedKey) {
+    return res.status(400).json({ error: 'Invalid security recovery key.' });
+  }
+
+  try {
+    // Check if the user exists
+    const userResult = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const user = userResult.rows[0];
+
+    if (!user) {
+      return res.status(404).json({ error: 'No user account found with that username.' });
+    }
+
+    if (user.is_active === false) {
+      return res.status(403).json({ error: 'This account is deactivated and cannot be reset.' });
+    }
+
+    // Hash the new password
+    const saltRounds = 10;
+    const newHash = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update password in DB
+    await pool.query('UPDATE users SET password_hash = $1 WHERE username = $2', [newHash, username]);
+
+    res.json({ message: 'Password reset successful! You can now log in with your new password.' });
+  } catch (err) {
+    console.error('Password reset error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
+
