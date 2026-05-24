@@ -16,12 +16,12 @@ async function seed() {
     const result = await pool.query("SELECT * FROM users WHERE username = 'gallecredit@gmail.com'");
     if (result.rows.length === 0) {
       console.log('Creating default admin user...');
-      const passwordHash = await bcrypt.hash('CreditGalle2026@', 10);
+      const passwordHash = await bcrypt.hash('CreditGalle2025', 10);
       await pool.query(
         "INSERT INTO users (name, role, username, password_hash) VALUES ($1, $2, $3, $4)",
         ['Galle Credit Admin', 'admin', 'gallecredit@gmail.com', passwordHash]
       );
-      console.log('Default admin user created: gallecredit@gmail.com / CreditGalle2026@');
+      console.log('Default admin user created: gallecredit@gmail.com / CreditGalle2025');
     } else {
       console.log('Admin user already exists.');
     }
