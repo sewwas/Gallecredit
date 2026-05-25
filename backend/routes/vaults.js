@@ -163,8 +163,8 @@ router.post('/handovers/:id/resolve', authorizeRole('admin', 'accountant'), asyn
       const amount = parseFloat(handover.amount);
 
       // Lock vaults to avoid deadlocks (order vaults by ID)
-      const firstId = Math.min(handover.from_vault_id, handover.to_vault_id);
-      const secondId = Math.max(handover.from_vault_id, handover.to_vault_id);
+      const firstId = Math.min(parseInt(handover.from_vault_id, 10), parseInt(handover.to_vault_id, 10));
+      const secondId = Math.max(parseInt(handover.from_vault_id, 10), parseInt(handover.to_vault_id, 10));
 
       await client.query('SELECT current_balance FROM cash_vaults WHERE vault_id = $1 FOR UPDATE', [firstId]);
       await client.query('SELECT current_balance FROM cash_vaults WHERE vault_id = $2 FOR UPDATE', [secondId]);

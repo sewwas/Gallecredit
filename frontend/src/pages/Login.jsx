@@ -67,7 +67,11 @@ const Login = () => {
       setResetStep(2);
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.error || 'Failed to send recovery code. Please verify your email.');
+      if (!err.response) {
+        setError('Network error: Cannot connect to the server. Please ensure the backend is running.');
+      } else {
+        setError(err.response?.data?.error || 'Failed to send recovery code. Please verify your email.');
+      }
     } finally {
       setLoading(false);
     }
