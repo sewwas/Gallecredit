@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     
     // Fetch user details from our custom API (for role, name, etc.)
     try {
-      const response = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/users/me`);
+      const response = await axios.get(`${"https://gallecredit-a9a2.vercel.app"}/api/users/me`);
       
       if (typeof response.data === 'string') {
         throw new Error("Backend connection failed: Received HTML instead of user data. Please check VITE_API_URL.");
