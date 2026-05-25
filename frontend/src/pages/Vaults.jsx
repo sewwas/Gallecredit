@@ -32,15 +32,15 @@ const Vaults = () => {
 
       if (isAdminOrAccountant) {
         const [vaultsRes, pendingRes] = await Promise.all([
-          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults`, config),
-          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handovers/pending`, config)
+          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/vaults`, config),
+          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/vaults/handovers/pending`, config)
         ]);
         setVaults(vaultsRes.data);
         setPendingHandovers(pendingRes.data);
       }
 
       // Always fetch personal drawer
-      const drawerRes = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/my-drawer`, config);
+      const drawerRes = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/vaults/my-drawer`, config);
       setMyDrawer(drawerRes.data);
     } catch (err) {
       console.error(err);
@@ -72,14 +72,14 @@ const Vaults = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handover`, { amount: handoverAmount }, config);
+      await axios.post(`\${"https://gallecredit-a9a2.vercel.app"}/api/vaults/handover`, { amount: handoverAmount }, config);
       setSuccessMsg('Handover request submitted successfully!');
       setHandoverAmount('');
       // Refresh personal drawer
-      const drawerRes = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/my-drawer`, config);
+      const drawerRes = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/vaults/my-drawer`, config);
       setMyDrawer(drawerRes.data);
       if (isAdminOrAccountant) {
-        const pendingRes = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handovers/pending`, config);
+        const pendingRes = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/vaults/handovers/pending`, config);
         setPendingHandovers(pendingRes.data);
       }
     } catch (err) {
@@ -97,7 +97,7 @@ const Vaults = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handovers/${id}/resolve`, { action }, config);
+      await axios.post(`\${"https://gallecredit-a9a2.vercel.app"}/api/vaults/handovers/${id}/resolve`, { action }, config);
       setSuccessMsg(`Handover request ${action === 'approved' ? 'approved' : 'rejected'} successfully!`);
       // Reload
       await fetchVaultsData();

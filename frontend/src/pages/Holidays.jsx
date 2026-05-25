@@ -29,7 +29,7 @@ const Holidays = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/holidays`, config);
+      const res = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/holidays`, config);
       setHolidays(res.data);
     } catch (err) {
       console.error(err);
@@ -57,11 +57,11 @@ const Holidays = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/holidays`, form, config);
+      await axios.post(`\${"https://gallecredit-a9a2.vercel.app"}/api/holidays`, form, config);
       setSuccessMsg('Holiday added/updated successfully!');
       setForm({ holiday_date: '', description: '', is_recurring: false });
       // Reload
-      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/holidays`, config);
+      const res = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/holidays`, config);
       setHolidays(res.data);
     } catch (err) {
       setErrorMsg(err.response?.data?.error || 'Failed to register holiday');
@@ -80,10 +80,10 @@ const Holidays = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      await axios.delete(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/holidays/${id}`, config);
+      await axios.delete(`\${"https://gallecredit-a9a2.vercel.app"}/api/holidays/${id}`, config);
       setSuccessMsg('Holiday deleted successfully!');
       // Reload
-      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/holidays`, config);
+      const res = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/holidays`, config);
       setHolidays(res.data);
     } catch (err) {
       setErrorMsg('Failed to delete holiday');

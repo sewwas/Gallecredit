@@ -24,7 +24,7 @@ const Customers = () => {
 
   const fetchDocs = async () => {
     try {
-      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`);
+      const res = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/customers/${selectedCustomerId}/documents`);
       setDocs(res.data);
     } catch (err) {
       console.error(err);
@@ -44,7 +44,7 @@ const Customers = () => {
 
     setUploading(true);
     try {
-      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`, formData);
+      await axios.post(`\${"https://gallecredit-a9a2.vercel.app"}/api/customers/${selectedCustomerId}/documents`, formData);
       fetchDocs();
     } catch (err) {
       alert('Upload failed');
@@ -62,7 +62,7 @@ const Customers = () => {
 
   const fetchCustomers = async () => {
     try {
-      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`);
+      const res = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/customers`);
       setCustomers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
@@ -79,9 +79,9 @@ const Customers = () => {
     e.preventDefault();
     try {
       if (editMode) {
-        await axios.put(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}`, formData);
+        await axios.put(`\${"https://gallecredit-a9a2.vercel.app"}/api/customers/${selectedCustomerId}`, formData);
       } else {
-        await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`, formData);
+        await axios.post(`\${"https://gallecredit-a9a2.vercel.app"}/api/customers`, formData);
       }
       closeModal();
       fetchCustomers();
@@ -300,7 +300,7 @@ const Customers = () => {
                       <p className="text-xs text-slate-500 font-medium mt-0.5">{new Date(doc.uploaded_at).toLocaleDateString()}</p>
                     </div>
                     <a 
-                      href={doc.file_path.startsWith('http') ? doc.file_path : `\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/uploads/${doc.file_name}`} 
+                      href={doc.file_path.startsWith('http') ? doc.file_path : `\${"https://gallecredit-a9a2.vercel.app"}/uploads/${doc.file_name}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-primary-600 hover:text-primary-700 text-sm font-bold hover:underline"
