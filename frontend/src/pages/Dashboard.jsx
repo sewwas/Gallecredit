@@ -25,13 +25,13 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         const [customersRes, loansRes, dailyRes, outRes, trendsRes, distRes, profitRes] = await Promise.all([
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/customers`),
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/loans`).catch(() => ({ data: [] })),
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/reports/daily-collection`).catch(() => ({ data: { total_collection: 0 } })),
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/reports/outstanding`).catch(() => ({ data: [] })),
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/reports/collection-trends`).catch(() => ({ data: [] })),
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/reports/loan-distribution`).catch(() => ({ data: [] })),
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/reports/profit-loss`).catch(() => ({ data: { projected_profit: 0, total_expenses: 0 } }))
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/customers`),
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/loans`).catch(() => ({ data: [] })),
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/reports/daily-collection`).catch(() => ({ data: { total_collection: 0 } })),
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/reports/outstanding`).catch(() => ({ data: [] })),
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/reports/collection-trends`).catch(() => ({ data: [] })),
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/reports/loan-distribution`).catch(() => ({ data: [] })),
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/reports/profit-loss`).catch(() => ({ data: { projected_profit: 0, total_expenses: 0 } }))
         ]);
 
         const totalOutstanding = Array.isArray(outRes.data) 

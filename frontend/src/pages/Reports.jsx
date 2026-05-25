@@ -17,8 +17,8 @@ const Reports = () => {
     const fetchReports = async () => {
       try {
         const [outRes, plRes] = await Promise.all([
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/reports/outstanding`),
-          axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/reports/profit-loss`)
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/reports/outstanding`),
+          axios.get(`\https://gallecredit-a9a2.vercel.app/api/reports/profit-loss`)
         ]);
         setOutstanding(outRes.data);
         setProfitLoss(plRes.data);

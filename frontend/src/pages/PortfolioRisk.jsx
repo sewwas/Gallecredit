@@ -28,7 +28,7 @@ const PortfolioRisk = () => {
     setErrorMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      const res = await axios.get(`\${"https://gallecredit-a9a2.vercel.app"}/api/portfolio/aging`, config);
+      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/portfolio/aging`, config);
       setData(res.data);
     } catch (err) {
       console.error(err);
