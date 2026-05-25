@@ -25,7 +25,7 @@ const Payments = () => {
   const fetchLoans = async () => {
     try {
       const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`);
-      setLoans(res.data.filter(l => l.status === 'disbursed'));
+      setLoans(Array.isArray(res.data) ? res.data.filter(l => l.status === 'disbursed') : []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -54,8 +54,8 @@ const Payments = () => {
     if (selectedLoanId) {
       axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/installments/loan/${selectedLoanId}`)
         .then(res => {
-          setAllInstallments(res.data);
-          setInstallments(res.data.filter(i => i.status !== 'paid'));
+          setAllInstallments(Array.isArray(res.data) ? res.data : []);
+          setInstallments(Array.isArray(res.data) ? res.data.filter(i => i.status !== 'paid') : []);
         })
         .catch(err => console.error(err));
 

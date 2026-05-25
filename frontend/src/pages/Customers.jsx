@@ -63,7 +63,7 @@ const Customers = () => {
   const fetchCustomers = async () => {
     try {
       const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`);
-      setCustomers(res.data);
+      setCustomers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
     } finally {
