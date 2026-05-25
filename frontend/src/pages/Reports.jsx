@@ -17,8 +17,8 @@ const Reports = () => {
     const fetchReports = async () => {
       try {
         const [outRes, plRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/reports/outstanding'),
-          axios.get('http://localhost:5000/api/reports/profit-loss')
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/outstanding`),
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/profit-loss`)
         ]);
         setOutstanding(outRes.data);
         setProfitLoss(plRes.data);

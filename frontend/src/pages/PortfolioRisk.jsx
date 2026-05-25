@@ -28,7 +28,7 @@ const PortfolioRisk = () => {
     setErrorMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      const res = await axios.get('http://localhost:5000/api/portfolio/aging', config);
+      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/portfolio/aging`, config);
       setData(res.data);
     } catch (err) {
       console.error(err);

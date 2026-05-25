@@ -86,8 +86,8 @@ const Loans = () => {
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
       const [loansRes, customersRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/loans', config),
-        axios.get('http://localhost:5000/api/customers', config)
+        axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`, config),
+        axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`, config)
       ]);
       setLoans(loansRes.data);
       setCustomers(customersRes.data);
@@ -109,7 +109,7 @@ const Loans = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post('http://localhost:5000/api/loans', formData, config);
+      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`, formData, config);
       setSuccessMsg('Loan application registered successfully (Maker action completed)!');
       setShowModal(false);
       setFormData({
@@ -139,7 +139,7 @@ const Loans = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`http://localhost:5000/api/loans/${id}/approve`, { notes: notes || 'Approved via Loans Desk.' }, config);
+      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${id}/approve`, { notes: notes || 'Approved via Loans Desk.' }, config);
       setSuccessMsg('Loan application approved successfully (Checker status active)!');
       setNotes('');
       fetchData();
@@ -156,7 +156,7 @@ const Loans = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`http://localhost:5000/api/loans/${id}/reject`, { notes: notes || 'Rejected via Loans Desk.' }, config);
+      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${id}/reject`, { notes: notes || 'Rejected via Loans Desk.' }, config);
       setSuccessMsg('Loan application rejected.');
       setNotes('');
       fetchData();
@@ -175,7 +175,7 @@ const Loans = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`http://localhost:5000/api/loans/${id}/disburse`, {}, config);
+      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${id}/disburse`, {}, config);
       setSuccessMsg('Capital successfully released and disbursed! Installments schedule active.');
       fetchData();
     } catch (err) {
@@ -188,7 +188,7 @@ const Loans = () => {
   const viewDetails = async (loan) => {
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      const res = await axios.get(`http://localhost:5000/api/loans/${loan.loan_id}`, config);
+      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${loan.loan_id}`, config);
       setViewInstallments(res.data.installments);
       setViewLoan(res.data);
     } catch (err) {

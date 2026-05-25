@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     
     // Fetch user details from our custom API (for role, name, etc.)
     try {
-      const response = await axios.get('http://localhost:5000/api/users/me');
+      const response = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/me`);
       setUser(response.data);
     } catch (error) {
       console.error('Failed to fetch user profile:', error);

@@ -24,7 +24,7 @@ const Payments = () => {
 
   const fetchLoans = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/loans');
+      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`);
       setLoans(res.data.filter(l => l.status === 'disbursed'));
     } catch (err) {
       console.error(err);
@@ -38,7 +38,7 @@ const Payments = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      const res = await axios.get('http://localhost:5000/api/vaults/my-drawer', config);
+      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/my-drawer`, config);
       setDrawerBalance(parseFloat(res.data.current_balance || 0));
     } catch (err) {
       console.error('Failed to load collector drawer balance', err);
@@ -52,7 +52,7 @@ const Payments = () => {
 
   useEffect(() => {
     if (selectedLoanId) {
-      axios.get(`http://localhost:5000/api/installments/loan/${selectedLoanId}`)
+      axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/installments/loan/${selectedLoanId}`)
         .then(res => {
           setAllInstallments(res.data);
           setInstallments(res.data.filter(i => i.status !== 'paid'));
@@ -61,7 +61,7 @@ const Payments = () => {
 
       const selectedLoanObj = loans.find(l => l.loan_id == selectedLoanId);
       if (selectedLoanObj) {
-        axios.get(`http://localhost:5000/api/customers/${selectedLoanObj.customer_id}`)
+        axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedLoanObj.customer_id}`)
           .then(res => setCustomerDetails(res.data))
           .catch(err => console.error(err));
       }
@@ -102,7 +102,7 @@ const Payments = () => {
     }
 
     try {
-      const res = await axios.post('http://localhost:5000/api/payments', {
+      const res = await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/payments`, {
         loan_id: selectedLoanId,
         ...paymentData
       });

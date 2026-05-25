@@ -30,19 +30,19 @@ const Accounting = () => {
     setLoading(true);
     try {
       if (activeTab === 'cashbook') {
-        const res = await axios.get('http://localhost:5000/api/cashbook');
+        const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/cashbook`);
         setData(prev => ({ ...prev, cashbook: res.data }));
       } else if (activeTab === 'expenses') {
-        const res = await axios.get('http://localhost:5000/api/expenses');
+        const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`);
         setData(prev => ({ ...prev, expenses: res.data }));
       } else if (activeTab === 'income') {
-        const res = await axios.get('http://localhost:5000/api/income');
+        const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/income`);
         setData(prev => ({ ...prev, income: res.data }));
       } else if (activeTab === 'accounts') {
-        const res = await axios.get('http://localhost:5000/api/accounting/accounts');
+        const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/accounts`);
         setData(prev => ({ ...prev, accounts: res.data }));
       } else if (activeTab === 'journals') {
-        const res = await axios.get('http://localhost:5000/api/accounting/journals');
+        const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/journals`);
         setData(prev => ({ ...prev, journals: res.data }));
       } else if (activeTab === 'dayclose') {
         await fetchDayStatus();
@@ -56,7 +56,7 @@ const Accounting = () => {
 
   const fetchDayStatus = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/accounting/status/${dayCloseDate}`);
+      const res = await axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/status/${dayCloseDate}`);
       setDayStatus(res.data);
     } catch (err) {
       console.error(err);
@@ -75,7 +75,7 @@ const Accounting = () => {
     if (!window.confirm(`Are you sure you want to close the accounts for ${dayCloseDate}? This cannot be undone.`)) return;
     setClosing(true);
     try {
-      await axios.post('http://localhost:5000/api/accounting/close', {
+      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/close`, {
         date: dayCloseDate,
         total_in: dayStatus.summary.total_in,
         total_out: dayStatus.summary.total_out,
@@ -92,7 +92,7 @@ const Accounting = () => {
   const handleExpenseSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/expenses', expenseForm);
+      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`, expenseForm);
       setShowExpenseModal(false);
       setExpenseForm({ date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '' });
       fetchData();
@@ -104,7 +104,7 @@ const Accounting = () => {
   const handleIncomeSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/income', incomeForm);
+      await axios.post(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/income`, incomeForm);
       setShowIncomeModal(false);
       setIncomeForm({ date: new Date().toISOString().split('T')[0], source: '', amount: '' });
       fetchData();

@@ -7,19 +7,10 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Multer config
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = path.join(__dirname, '../uploads');
-    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath);
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-const upload = multer({ storage });
+const { supabase } = require('../utils/supabaseClient');
+
+// Multer memory storage
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.use(authenticateToken);
 
@@ -29,12 +20,37 @@ router.use(authenticateToken);
 router.post('/:id/documents', upload.single('document'), async (req, res) => {
   const customerId = req.params.id;
   const { document_type } = req.body;
-  const { filename, path: filePath } = req.file;
+  
+  if (!req.file) {
+    return res.status(400).json({ error: 'No document file provided' });
+  }
+
+  const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+  const filename = req.file.fieldname + '-' + uniqueSuffix + path.extname(req.file.originalname);
 
   try {
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .upload(filename, req.file.buffer, {
+        contentType: req.file.mimetype,
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return res.status(500).json({ error: 'Failed to upload document to storage' });
+    }
+
+    // Get public URL
+    const { data: publicUrlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filename);
+      
+    const publicUrl = publicUrlData.publicUrl;
+
     const result = await pool.query(
       'INSERT INTO customer_documents (customer_id, document_type, file_name, file_path) VALUES ($1, $2, $3, $4) RETURNING *',
-      [customerId, document_type, filename, filePath]
+      [customerId, document_type, filename, publicUrl]
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {

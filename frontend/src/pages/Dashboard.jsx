@@ -25,13 +25,13 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         const [customersRes, loansRes, dailyRes, outRes, trendsRes, distRes, profitRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/customers'),
-          axios.get('http://localhost:5000/api/loans').catch(() => ({ data: [] })),
-          axios.get('http://localhost:5000/api/reports/daily-collection').catch(() => ({ data: { total_collection: 0 } })),
-          axios.get('http://localhost:5000/api/reports/outstanding').catch(() => ({ data: [] })),
-          axios.get('http://localhost:5000/api/reports/collection-trends').catch(() => ({ data: [] })),
-          axios.get('http://localhost:5000/api/reports/loan-distribution').catch(() => ({ data: [] })),
-          axios.get('http://localhost:5000/api/reports/profit-loss').catch(() => ({ data: { projected_profit: 0, total_expenses: 0 } }))
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`),
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`).catch(() => ({ data: [] })),
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/daily-collection`).catch(() => ({ data: { total_collection: 0 } })),
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/outstanding`).catch(() => ({ data: [] })),
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/collection-trends`).catch(() => ({ data: [] })),
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/loan-distribution`).catch(() => ({ data: [] })),
+          axios.get(`\${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/profit-loss`).catch(() => ({ data: { projected_profit: 0, total_expenses: 0 } }))
         ]);
 
         const totalOutstanding = Array.isArray(outRes.data) 
