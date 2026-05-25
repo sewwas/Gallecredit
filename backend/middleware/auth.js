@@ -1,16 +1,34 @@
-const jwt = require('jsonwebtoken');
+const { supabase } = require('../utils/supabaseClient');
+const { pool } = require('../db');
 
-const authenticateToken = (req, res, next) => {
+const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) return res.status(401).json({ error: 'Access denied' });
 
-  jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkey_please_change_in_production', (err, user) => {
-    if (err) return res.status(403).json({ error: 'Invalid token' });
-    req.user = user;
-    next();
-  });
+  // Use Supabase to verify token
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  
+  if (error || !user) {
+    return res.status(403).json({ error: 'Invalid token' });
+  }
+
+  // Fetch the role from our custom users table since Supabase users don't have roles by default
+  const dbUser = await pool.query('SELECT user_id, role, username FROM users WHERE username = $1', [user.email]);
+  
+  if (dbUser.rows.length === 0) {
+    return res.status(403).json({ error: 'User not registered in the system' });
+  }
+
+  req.user = {
+    userId: dbUser.rows[0].user_id,
+    role: dbUser.rows[0].role,
+    username: dbUser.rows[0].username,
+    email: user.email
+  };
+  
+  next();
 };
 
 const authorizeRole = (...allowedRoles) => {

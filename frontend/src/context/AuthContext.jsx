@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-
-// SET TO false TO ENABLE THE FULL LOGIN SECURITY SCREEN BACK
-const BYPASS_LOGIN_FOR_DEV = false;
+import { supabase } from '../supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -11,41 +9,61 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (BYPASS_LOGIN_FOR_DEV) {
-      const mockUser = { id: 1, username: 'admin', role: 'admin', name: 'Dev Admin' };
-      localStorage.setItem('token', 'dev-bypass-token');
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      axios.defaults.headers.common['Authorization'] = 'Bearer dev-bypass-token';
-      setUser(mockUser);
-      setLoading(false);
-    } else {
-      const token = localStorage.getItem('token');
-      const storedUser = localStorage.getItem('user');
-      if (token && token !== 'dev-bypass-token' && storedUser) {
-        setUser(JSON.parse(storedUser));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      } else if (token === 'dev-bypass-token') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        handleSession(session);
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
-    }
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        handleSession(session);
+      } else {
+        setUser(null);
+        delete axios.defaults.headers.common['Authorization'];
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (username, password) => {
-    const response = await axios.post('http://localhost:5000/api/auth/login', { username, password });
-    const { token, user: userData } = response.data;
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+  const handleSession = async (session) => {
+    const token = session.access_token;
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    setUser(userData);
+    
+    // Fetch user details from our custom API (for role, name, etc.)
+    try {
+      const response = await axios.get('http://localhost:5000/api/users/me');
+      setUser(response.data);
+    } catch (error) {
+      console.error('Failed to fetch user profile:', error);
+      setUser(null);
+    }
+    setLoading(false);
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    delete axios.defaults.headers.common['Authorization'];
+  const login = async (username, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: username,
+      password: password,
+    });
+    
+    if (error) {
+      throw new Error(error.message);
+    }
+    
+    await handleSession(data.session);
+  };
+
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    delete axios.defaults.headers.common['Authorization'];
   };
 
   return (

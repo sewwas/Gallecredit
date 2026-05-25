@@ -4,8 +4,29 @@ const bcrypt = require('bcrypt');
 const { pool } = require('../db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
-// Secure all user routes: Only admins can manage system users
+// Secure all user routes
 router.use(authenticateToken);
+
+// 0. GET /me - Get current user profile (Accessible to all authenticated users)
+router.get('/me', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT user_id, name, role, username, is_active FROM users WHERE user_id = $1',
+      [req.user.userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    // Rename user_id to id to match what frontend expects
+    const user = result.rows[0];
+    res.json({ id: user.user_id, ...user });
+  } catch (err) {
+    console.error('Failed to fetch profile:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Rest of routes: Only admins can manage system users
 router.use(authorizeRole('admin'));
 
 // 1. GET / - List all users (excluding password hashes)
