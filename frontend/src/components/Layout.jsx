@@ -146,7 +146,7 @@ const Layout = () => {
         <div className="p-4 border-t border-slate-700/50 bg-slate-900/50">
           <div className={`flex items-center gap-3 px-3 py-2 mb-3 ${isCollapsed ? 'lg:justify-center lg:px-0' : ''}`}>
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary-500 to-accent-500 text-white flex items-center justify-center font-bold text-sm uppercase shadow-lg flex-shrink-0">
-              {user.name.charAt(0)}
+              {user?.name?.charAt(0) || '?'}
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0 animate-in fade-in duration-300">

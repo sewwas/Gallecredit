@@ -347,7 +347,7 @@ const Payments = () => {
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-gradient-to-tr from-primary-600 to-accent-500 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shadow-primary-500/20">
-                      {selectedLoan.customer_name.charAt(0)}
+                      {selectedLoan?.customer_name?.charAt(0) || '?'}
                     </div>
                     <div className="space-y-1">
                       <h3 className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">{selectedLoan.customer_name}</h3>

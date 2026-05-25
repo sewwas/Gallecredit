@@ -220,7 +220,7 @@ const Users = () => {
                     u.role === 'accountant' ? 'bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-indigo-500/20' :
                     'bg-gradient-to-tr from-emerald-500 to-teal-500 shadow-emerald-500/20'
                   }`}>
-                    {u.name.charAt(0)}
+                    {u?.name?.charAt(0) || '?'}
                   </div>
                   <div>
                     <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-1.5">
