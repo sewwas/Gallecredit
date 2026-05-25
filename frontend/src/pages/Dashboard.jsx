@@ -51,14 +51,15 @@ const Dashboard = () => {
           totalExpenses: profitRes.data.total_expenses || 0
         });
 
-        // Format dates for the chart
-        const formattedTrends = trendsRes.data.map(item => ({
+        // Format dates for the chart safely
+        const trendsData = Array.isArray(trendsRes.data) ? trendsRes.data : [];
+        const formattedTrends = trendsData.map(item => ({
           ...item,
           date: new Date(item.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })
         }));
         setTrends(formattedTrends);
 
-        setDistribution(distRes.data);
+        setDistribution(Array.isArray(distRes.data) ? distRes.data : []);
       } catch (err) {
         console.error("Failed to load dashboard data", err);
       } finally {
