@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
       if (session) {
         handleSession(session);
       } else {
+        localStorage.removeItem('token');
         setLoading(false);
       }
     });
@@ -24,6 +25,7 @@ export const AuthProvider = ({ children }) => {
         handleSession(session);
       } else {
         setUser(null);
+        localStorage.removeItem('token');
         delete axios.defaults.headers.common['Authorization'];
         setLoading(false);
       }
@@ -34,6 +36,8 @@ export const AuthProvider = ({ children }) => {
 
   const handleSession = async (session) => {
     const token = session.access_token;
+    // Store in localStorage so pages using localStorage.getItem('token') work
+    localStorage.setItem('token', token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     
     // Fetch user details from our custom API (for role, name, etc.)
@@ -69,6 +73,7 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
   };
 
