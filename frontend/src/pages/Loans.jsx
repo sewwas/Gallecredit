@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { Navigate } from 'react-router-dom';
 import { Plus, Eye, ShieldAlert, CalendarClock, Check, X, Sparkles, Receipt, RefreshCw, Landmark } from 'lucide-react';
 
 const Loans = () => {
   const { user } = useAuth();
+  if (user?.role === 'staff') {
+    return <Navigate to="/payments" replace />;
+  }
   const isAdminOrAccountant = user?.role === 'admin' || user?.role === 'accountant';
 
   const [loans, setLoans] = useState([]);
@@ -19,6 +23,10 @@ const Loans = () => {
   
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const [filterLocation, setFilterLocation] = useState('all');
+  const [filterProgress, setFilterProgress] = useState('all');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState({
     customer_id: '',
@@ -86,8 +94,8 @@ const Loans = () => {
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
       const [loansRes, customersRes] = await Promise.all([
-        axios.get(`\https://gallecredit-a9a2.vercel.app/api/loans`, config),
-        axios.get(`\https://gallecredit-a9a2.vercel.app/api/customers`, config)
+        axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`, config),
+        axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`, config)
       ]);
       setLoans(loansRes.data);
       setCustomers(customersRes.data);
@@ -105,11 +113,13 @@ const Loans = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setErrorMsg('');
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/loans`, formData, config);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`, formData, config);
       setSuccessMsg('Loan application registered successfully (Maker action completed)!');
       setShowModal(false);
       setFormData({
@@ -130,6 +140,8 @@ const Loans = () => {
       fetchData();
     } catch (err) {
       setErrorMsg(err.response?.data?.error || 'Failed to submit loan application');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -139,7 +151,7 @@ const Loans = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/loans/${id}/approve`, { notes: notes || 'Approved via Loans Desk.' }, config);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${id}/approve`, { notes: notes || 'Approved via Loans Desk.' }, config);
       setSuccessMsg('Loan application approved successfully (Checker status active)!');
       setNotes('');
       fetchData();
@@ -156,7 +168,7 @@ const Loans = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/loans/${id}/reject`, { notes: notes || 'Rejected via Loans Desk.' }, config);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${id}/reject`, { notes: notes || 'Rejected via Loans Desk.' }, config);
       setSuccessMsg('Loan application rejected.');
       setNotes('');
       fetchData();
@@ -175,7 +187,7 @@ const Loans = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/loans/${id}/disburse`, {}, config);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${id}/disburse`, {}, config);
       setSuccessMsg('Capital successfully released and disbursed! Installments schedule active.');
       fetchData();
     } catch (err) {
@@ -188,7 +200,7 @@ const Loans = () => {
   const viewDetails = async (loan) => {
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/loans/${loan.loan_id}`, config);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans/${loan.loan_id}`, config);
       setViewInstallments(res.data.installments);
       setViewLoan(res.data);
     } catch (err) {
@@ -197,11 +209,43 @@ const Loans = () => {
   };
 
   // Tab Filtering
+  // Get unique locations dynamically from loaded loans
+  const uniqueLocations = Array.from(
+    new Set(loans.map(l => l.customer_location).filter(Boolean))
+  );
+
   const filteredLoans = loans.filter(l => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'pending') return l.status === 'pending_approval';
-    if (activeTab === 'approved') return l.status === 'approved';
-    if (activeTab === 'active') return l.status === 'disbursed';
+    // 1. Tab Filter
+    let matchesTab = true;
+    if (activeTab === 'all') matchesTab = true;
+    else if (activeTab === 'pending') matchesTab = l.status === 'pending_approval';
+    else if (activeTab === 'approved') matchesTab = l.status === 'approved';
+    else if (activeTab === 'active') matchesTab = l.status === 'disbursed';
+
+    if (!matchesTab) return false;
+
+    // 2. Location Filter
+    if (filterLocation !== 'all' && l.customer_location !== filterLocation) {
+      return false;
+    }
+
+    // 3. Progress / Payment status filter
+    if (filterProgress !== 'all') {
+      const totalAmount = parseFloat(l.total_installments_amount || 0);
+      const totalPaid = parseFloat(l.total_paid || 0);
+      const progress = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+
+      if (filterProgress === 'not_paid') {
+        if (totalPaid > 0) return false;
+      } else if (filterProgress === 'partial') {
+        if (progress === 0 || progress >= 50) return false;
+      } else if (filterProgress === 'mostly') {
+        if (progress < 50 || progress >= 100) return false;
+      } else if (filterProgress === 'fully') {
+        if (progress < 100) return false;
+      }
+    }
+
     return true;
   });
 
@@ -270,6 +314,38 @@ const Loans = () => {
         </button>
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4 border border-slate-100 p-5 rounded-2xl bg-white shadow-sm">
+        <div className="flex-1 md:flex-none w-full md:w-64">
+          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Filter Location</label>
+          <select 
+            className="premium-input bg-white text-sm py-2.5"
+            value={filterLocation}
+            onChange={(e) => setFilterLocation(e.target.value)}
+          >
+            <option value="all">All Locations</option>
+            {uniqueLocations.map(loc => (
+              <option key={loc} value={loc}>{loc}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex-1 md:flex-none w-full md:w-64">
+          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-2">Filter Repayment Progress</label>
+          <select 
+            className="premium-input bg-white text-sm py-2.5"
+            value={filterProgress}
+            onChange={(e) => setFilterProgress(e.target.value)}
+          >
+            <option value="all">All Statuses</option>
+            <option value="not_paid">Not Paid (0%)</option>
+            <option value="partial">Partially Paid (&lt;50%)</option>
+            <option value="mostly">Mostly Paid (&ge;50%)</option>
+            <option value="fully">Fully Repaid (100%)</option>
+          </select>
+        </div>
+      </div>
+
       {/* List Container */}
       <div className="glass-panel overflow-hidden">
         {loading ? (
@@ -286,6 +362,7 @@ const Loans = () => {
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200">
                   <th className="py-5 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider">Customer</th>
+                  <th className="py-5 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider">Loan Code</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider">Principal</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider">Type</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-600 uppercase tracking-wider">Due Date</th>
@@ -297,6 +374,7 @@ const Loans = () => {
                 {filteredLoans.map((l) => (
                   <tr key={l.loan_id} className="hover:bg-slate-50/50 transition-colors duration-200">
                     <td className="py-5 px-6 text-sm font-semibold text-slate-800">{l.customer_name}</td>
+                    <td className="py-5 px-6 text-sm font-bold text-primary-700">{l.loan_code || `L-${l.loan_id}`}</td>
                     <td className="py-5 px-6 text-sm font-bold text-slate-900">Rs. {parseFloat(l.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
                     <td className="py-5 px-6 text-sm text-slate-600 capitalize">
                       <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${
@@ -332,14 +410,14 @@ const Loans = () => {
                             />
                             <button 
                               onClick={() => handleApprove(l.loan_id)}
-                              disabled={actioningId === l.loan_id}
+                              disabled={actioningId !== null || isSubmitting}
                               className="bg-green-600 hover:bg-green-700 text-white p-2 rounded-lg"
                             >
                               <Check className="w-3.5 h-3.5" />
                             </button>
                             <button 
                               onClick={() => handleReject(l.loan_id)}
-                              disabled={actioningId === l.loan_id}
+                              disabled={actioningId !== null || isSubmitting}
                               className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg"
                             >
                               <X className="w-3.5 h-3.5" />
@@ -351,7 +429,7 @@ const Loans = () => {
                         {l.status === 'approved' && isAdminOrAccountant && (
                           <button 
                             onClick={() => handleDisburse(l.loan_id)}
-                            disabled={actioningId === l.loan_id}
+                            disabled={actioningId !== null || isSubmitting}
                             className="flex items-center gap-1 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white text-xs font-bold px-3 py-2 rounded-xl shadow shadow-green-500/10 transition-all"
                           >
                             <Landmark className="w-3.5 h-3.5" /> Disburse
@@ -498,8 +576,10 @@ const Loans = () => {
               </div>
 
               <div className="pt-4 flex flex-col sm:flex-row gap-4">
-                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3.5 bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold rounded-xl transition-all">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold rounded-xl shadow-lg transition-all duration-300">File Application</button>
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-3.5 bg-slate-100 text-slate-600 hover:bg-slate-200 font-bold rounded-xl transition-all" disabled={isSubmitting}>Cancel</button>
+                <button type="submit" className="flex-1 px-4 py-3.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold rounded-xl shadow-lg transition-all duration-300" disabled={isSubmitting}>
+                  {isSubmitting ? 'Filing Application...' : 'File Application'}
+                </button>
               </div>
             </form>
           </div>
@@ -513,7 +593,7 @@ const Loans = () => {
             <div className="px-8 py-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">Loan & Audit Details</h3>
-                <p className="text-sm text-slate-500 font-medium mt-1">{viewLoan.customer_name} • Application ID: #{viewLoan.loan_id}</p>
+                <p className="text-sm text-slate-500 font-medium mt-1">{viewLoan.customer_name} • Loan Code: {viewLoan.loan_code || `L-${viewLoan.loan_id}`}</p>
               </div>
               <button onClick={() => setViewLoan(null)} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">
                 <X className="w-6 h-6" />

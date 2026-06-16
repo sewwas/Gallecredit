@@ -28,13 +28,22 @@ const Layout = () => {
     return <Navigate to="/login" />;
   }
 
-  const navItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Customers', path: '/customers', icon: Users },
-    { name: 'Loans', path: '/loans', icon: CreditCard },
-    { name: 'Log Payments', path: '/payments', icon: Receipt },
-    { name: 'Vaults', path: '/vaults', icon: Wallet },
-  ];
+  if (user.role === 'staff' && location.pathname === '/') {
+    return <Navigate to="/payments" replace />;
+  }
+
+  const navItems = [];
+  if (user.role === 'staff') {
+    navItems.push({ name: 'Log Payments', path: '/payments', icon: Receipt });
+    navItems.push({ name: 'Customers', path: '/customers', icon: Users });
+    navItems.push({ name: 'My Cash Drawer', path: '/vaults', icon: Wallet });
+  } else {
+    navItems.push({ name: 'Dashboard', path: '/', icon: LayoutDashboard });
+    navItems.push({ name: 'Customers', path: '/customers', icon: Users });
+    navItems.push({ name: 'Loans', path: '/loans', icon: CreditCard });
+    navItems.push({ name: 'Log Payments', path: '/payments', icon: Receipt });
+    navItems.push({ name: 'Vaults', path: '/vaults', icon: Wallet });
+  }
 
   if (user.role === 'admin' || user.role === 'accountant') {
     navItems.push({ name: 'Accounting', path: '/accounting', icon: BookOpen });

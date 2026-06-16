@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
+const { dayCloseGuard } = require('../middleware/dayCloseGuard');
 
 router.use(authenticateToken);
 
@@ -39,9 +40,23 @@ function getNextWorkingDate(startDate, loanType, holidaySet) {
 router.get('/', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT l.*, c.name as customer_name 
+      SELECT 
+        l.*, 
+        c.name as customer_name,
+        c.location as customer_location,
+        c.location_code as customer_location_code,
+        COALESCE(i.total_paid, 0) as total_paid,
+        COALESCE(i.total_due, 0) as total_installments_amount
       FROM loans l 
-      JOIN customers c ON l.customer_id = c.customer_id 
+      JOIN customers c ON l.customer_id = c.customer_id
+      LEFT JOIN (
+        SELECT 
+          loan_id, 
+          SUM(paid_amount) as total_paid, 
+          SUM(amount) as total_due 
+        FROM installments 
+        GROUP BY loan_id
+      ) i ON l.loan_id = i.loan_id
       ORDER BY l.issue_date DESC, l.loan_id DESC
     `);
     res.json(result.rows);
@@ -79,7 +94,7 @@ router.post('/', async (req, res) => {
     await client.query('BEGIN');
 
     // KYC Verification check
-    const customerQuery = await client.query('SELECT kyc_status FROM customers WHERE customer_id = $1', [customer_id]);
+    const customerQuery = await client.query('SELECT kyc_status, location_code FROM customers WHERE customer_id = $1', [customer_id]);
     if (customerQuery.rows.length === 0) {
       await client.query('ROLLBACK');
       return res.status(404).json({ error: 'Customer not found' });
@@ -136,6 +151,16 @@ router.post('/', async (req, res) => {
       }
     }
 
+    // Count loans for this customer to establish sequence
+    const countQuery = await client.query('SELECT COUNT(*) FROM loans WHERE customer_id = $1', [customer_id]);
+    const loanCount = parseInt(countQuery.rows[0].count, 10);
+    const locationCode = customerQuery.rows[0].location_code || 'GL';
+    let typePrefix = 'D';
+    if (loan_type === 'weekly') typePrefix = 'W';
+    else if (loan_type === 'monthly') typePrefix = 'M';
+    const customerIdPadded = String(customer_id).padStart(3, '0');
+    const loanCode = `${typePrefix}-${locationCode.toUpperCase()}-${customerIdPadded}-${loanCount + 1}`;
+
     const finalDueDate = installmentsDraft[installmentsDraft.length - 1].due_date;
 
     // Insert Loan as 'pending_approval' (Maker action)
@@ -143,9 +168,9 @@ router.post('/', async (req, res) => {
       `INSERT INTO loans (
         customer_id, loan_amount, interest_rate, loan_type, interest_method, 
         issue_date, due_date, total_amount, grace_period_days, penalty_rate, 
-        status, created_by_id, no_of_installments
+        status, created_by_id, no_of_installments, loan_code
       ) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending_approval', $11, $12) RETURNING *`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending_approval', $11, $12, $13) RETURNING *`,
       [
         customer_id, 
         amount, 
@@ -158,7 +183,8 @@ router.post('/', async (req, res) => {
         grace_period_days || 3,
         penalty_rate || 2.0,
         req.user.userId,
-        n
+        n,
+        loanCode
       ]
     );
 
@@ -294,7 +320,7 @@ router.post('/:id/reject', async (req, res) => {
 });
 
 // CHECKER/CASHIER: Disburse Approved Loan (Subtracts from Branch safe, generates real installments, writes General Ledger)
-router.post('/:id/disburse', async (req, res) => {
+router.post('/:id/disburse', dayCloseGuard, async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'accountant') {
     return res.status(403).json({ error: 'Unauthorized role. Cashier authorization required.' });
   }
@@ -329,6 +355,11 @@ router.post('/:id/disburse', async (req, res) => {
     }
     const centralVault = centralVaultQuery.rows[0];
     const newVaultBalance = parseFloat(centralVault.current_balance) - amount;
+
+    if (newVaultBalance < 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Insufficient funds in Branch Main Safe' });
+    }
 
     await client.query(
       'UPDATE cash_vaults SET current_balance = $1 WHERE vault_id = $2',

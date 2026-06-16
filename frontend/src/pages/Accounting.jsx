@@ -22,6 +22,8 @@ const Accounting = () => {
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [incomeForm, setIncomeForm] = useState({ date: new Date().toISOString().split('T')[0], source: '', amount: '' });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   if (user?.role !== 'admin' && user?.role !== 'accountant') {
     return <Navigate to="/" />;
   }
@@ -30,19 +32,19 @@ const Accounting = () => {
     setLoading(true);
     try {
       if (activeTab === 'cashbook') {
-        const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/cashbook`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/cashbook`);
         setData(prev => ({ ...prev, cashbook: res.data }));
       } else if (activeTab === 'expenses') {
-        const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/expenses`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`);
         setData(prev => ({ ...prev, expenses: res.data }));
       } else if (activeTab === 'income') {
-        const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/income`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/income`);
         setData(prev => ({ ...prev, income: res.data }));
       } else if (activeTab === 'accounts') {
-        const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/accounting/accounts`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/accounts`);
         setData(prev => ({ ...prev, accounts: res.data }));
       } else if (activeTab === 'journals') {
-        const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/accounting/journals`);
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/journals`);
         setData(prev => ({ ...prev, journals: res.data }));
       } else if (activeTab === 'dayclose') {
         await fetchDayStatus();
@@ -56,7 +58,7 @@ const Accounting = () => {
 
   const fetchDayStatus = async () => {
     try {
-      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/accounting/status/${dayCloseDate}`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/status/${dayCloseDate}`);
       setDayStatus(res.data);
     } catch (err) {
       console.error(err);
@@ -75,7 +77,7 @@ const Accounting = () => {
     if (!window.confirm(`Are you sure you want to close the accounts for ${dayCloseDate}? This cannot be undone.`)) return;
     setClosing(true);
     try {
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/accounting/close`, {
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/close`, {
         date: dayCloseDate,
         total_in: dayStatus.summary.total_in,
         total_out: dayStatus.summary.total_out,
@@ -91,25 +93,33 @@ const Accounting = () => {
 
   const handleExpenseSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/expenses`, expenseForm);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`, expenseForm);
       setShowExpenseModal(false);
       setExpenseForm({ date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '' });
       fetchData();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to save expense');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleIncomeSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     try {
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/income`, incomeForm);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/income`, incomeForm);
       setShowIncomeModal(false);
       setIncomeForm({ date: new Date().toISOString().split('T')[0], source: '', amount: '' });
       fetchData();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to save income');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -461,26 +471,28 @@ const Accounting = () => {
             <form onSubmit={handleExpenseSubmit} className="p-8 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
-                <input required type="date" className="premium-input" value={expenseForm.date} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} />
+                <input required disabled={isSubmitting} type="date" className="premium-input" value={expenseForm.date} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Category</label>
-                <input required type="text" className="premium-input" placeholder="e.g. Utility, Office Supply" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} />
+                <input required disabled={isSubmitting} type="text" className="premium-input" placeholder="e.g. Utility, Office Supply" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 font-medium">Rs.</span>
-                  <input required type="number" step="0.01" className="premium-input pl-12" placeholder="0.00" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
+                  <input required disabled={isSubmitting} type="number" step="0.01" className="premium-input pl-12" placeholder="0.00" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
-                <textarea className="premium-input resize-none" rows="3" placeholder="Add more details..." value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})}></textarea>
+                <textarea disabled={isSubmitting} className="premium-input resize-none" rows="3" placeholder="Add more details..." value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})}></textarea>
               </div>
               <div className="pt-2 flex gap-4">
-                <button type="button" onClick={() => setShowExpenseModal(false)} className="flex-1 secondary-btn">Cancel</button>
-                <button type="submit" className="flex-1 accent-btn">Save Expense</button>
+                <button type="button" onClick={() => setShowExpenseModal(false)} className="flex-1 secondary-btn" disabled={isSubmitting}>Cancel</button>
+                <button type="submit" className="flex-1 accent-btn" disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : 'Save Expense'}
+                </button>
               </div>
             </form>
           </div>
@@ -503,22 +515,24 @@ const Accounting = () => {
             <form onSubmit={handleIncomeSubmit} className="p-8 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
-                <input required type="date" className="premium-input" value={incomeForm.date} onChange={e => setIncomeForm({...incomeForm, date: e.target.value})} />
+                <input required disabled={isSubmitting} type="date" className="premium-input" value={incomeForm.date} onChange={e => setIncomeForm({...incomeForm, date: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Source</label>
-                <input required type="text" className="premium-input" placeholder="e.g. Consultation Fee" value={incomeForm.source} onChange={e => setIncomeForm({...incomeForm, source: e.target.value})} />
+                <input required disabled={isSubmitting} type="text" className="premium-input" placeholder="e.g. Consultation Fee" value={incomeForm.source} onChange={e => setIncomeForm({...incomeForm, source: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 font-medium">Rs.</span>
-                  <input required type="number" step="0.01" className="premium-input pl-12" placeholder="0.00" value={incomeForm.amount} onChange={e => setIncomeForm({...incomeForm, amount: e.target.value})} />
+                  <input required disabled={isSubmitting} type="number" step="0.01" className="premium-input pl-12" placeholder="0.00" value={incomeForm.amount} onChange={e => setIncomeForm({...incomeForm, amount: e.target.value})} />
                 </div>
               </div>
               <div className="pt-2 flex gap-4">
-                <button type="button" onClick={() => setShowIncomeModal(false)} className="flex-1 secondary-btn">Cancel</button>
-                <button type="submit" className="flex-1 premium-btn">Save Income</button>
+                <button type="button" onClick={() => setShowIncomeModal(false)} className="flex-1 secondary-btn" disabled={isSubmitting}>Cancel</button>
+                <button type="submit" className="flex-1 premium-btn" disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : 'Save Income'}
+                </button>
               </div>
             </form>
           </div>

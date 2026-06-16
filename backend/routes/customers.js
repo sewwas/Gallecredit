@@ -98,11 +98,11 @@ router.get('/:id', async (req, res) => {
 
 // Create a customer
 router.post('/', async (req, res) => {
-  const { name, nic, phone, address, kyc_status } = req.body;
+  const { name, nic, phone, address, kyc_status, location, location_code } = req.body;
   try {
     const result = await pool.query(
-      'INSERT INTO customers (name, nic, phone, address, kyc_status) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [name, nic, phone, address, kyc_status || 'pending']
+      'INSERT INTO customers (name, nic, phone, address, kyc_status, location, location_code) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [name, nic, phone, address, kyc_status || 'pending', location || 'Galle', location_code || 'GL']
     );
     res.status(201).json(result.rows[0]);
   } catch (err) {
@@ -116,16 +116,19 @@ router.post('/', async (req, res) => {
 
 // Update a customer
 router.put('/:id', async (req, res) => {
-  const { name, nic, phone, address, kyc_status } = req.body;
+  const { name, nic, phone, address, kyc_status, location, location_code } = req.body;
   try {
     const result = await pool.query(
-      'UPDATE customers SET name = $1, nic = $2, phone = $3, address = $4, kyc_status = $5 WHERE customer_id = $6 RETURNING *',
-      [name, nic, phone, address, kyc_status, req.params.id]
+      'UPDATE customers SET name = $1, nic = $2, phone = $3, address = $4, kyc_status = $5, location = $6, location_code = $7 WHERE customer_id = $8 RETURNING *',
+      [name, nic, phone, address, kyc_status, location || 'Galle', location_code || 'GL', req.params.id]
     );
     if (result.rows.length === 0) return res.status(404).json({ error: 'Customer not found' });
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
+    if (err.code === '23505') { // Unique violation
+      return res.status(400).json({ error: 'NIC already exists' });
+    }
     res.status(500).json({ error: 'Internal server error' });
   }
 });

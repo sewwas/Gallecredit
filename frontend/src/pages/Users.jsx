@@ -43,7 +43,7 @@ const Users = () => {
     setErrorMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/users`, config);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users`, config);
       setUsers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
@@ -76,7 +76,7 @@ const Users = () => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/users`, formData, config);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users`, formData, config);
       setSuccessMsg(`User account '${formData.username}' created successfully.`);
       setShowAddModal(false);
       setFormData({ name: '', username: '', role: 'staff', password: '' });
@@ -116,7 +116,7 @@ const Users = () => {
         payload.password = formData.password;
       }
 
-      await axios.put(`\https://gallecredit-a9a2.vercel.app/api/users/${selectedUser.user_id}`, payload, config);
+      await axios.put(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/${selectedUser.user_id}`, payload, config);
       setSuccessMsg(`Employee profile for '${formData.username}' updated successfully.`);
       setShowEditModal(false);
       setSelectedUser(null);
@@ -133,7 +133,7 @@ const Users = () => {
     setSuccessMsg('');
     try {
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
-      const res = await axios.delete(`\https://gallecredit-a9a2.vercel.app/api/users/${targetUser.user_id}`, config);
+      const res = await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/${targetUser.user_id}`, config);
       setSuccessMsg(res.data.message);
       fetchUsers();
     } catch (err) {

@@ -1,20 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Plus, Edit2, Trash2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+
+const PREDEFINED_LOCATIONS = [
+  { name: 'Galle', code: 'GL' },
+  { name: 'Karapitiya', code: 'KP' },
+  { name: 'Hikkaduwa', code: 'HK' },
+  { name: 'Unawatuna', code: 'UN' }
+];
 
 const Customers = () => {
+  const { user } = useAuth();
+  const isStaff = user?.role === 'staff';
+
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
-  const [formData, setFormData] = useState({ name: '', nic: '', phone: '', address: '', kyc_status: 'pending' });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    nic: '', 
+    phone: '', 
+    address: '', 
+    kyc_status: 'pending',
+    location: 'Galle',
+    location_code: 'GL'
+  });
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewingDocs, setViewingDocs] = useState(false);
   const [docs, setDocs] = useState([]);
   const [uploading, setUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCustomLoc, setIsCustomLoc] = useState(false);
 
   useEffect(() => {
     if (viewingDocs && selectedCustomerId) {
@@ -24,7 +45,7 @@ const Customers = () => {
 
   const fetchDocs = async () => {
     try {
-      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/customers/${selectedCustomerId}/documents`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`);
       setDocs(res.data);
     } catch (err) {
       console.error(err);
@@ -38,13 +59,13 @@ const Customers = () => {
     const type = prompt('Enter document type (e.g. NIC Front, NIC Back, Utility Bill):', 'NIC Front');
     if (!type) return;
 
-    const formData = new FormData();
-    formData.append('document', file);
-    formData.append('document_type', type);
+    const formDataObj = new FormData();
+    formDataObj.append('document', file);
+    formDataObj.append('document_type', type);
 
     setUploading(true);
     try {
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/customers/${selectedCustomerId}/documents`, formData);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`, formDataObj);
       fetchDocs();
     } catch (err) {
       alert('Upload failed');
@@ -55,14 +76,14 @@ const Customers = () => {
 
   const filteredCustomers = customers.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                         c.nic.toLowerCase().includes(searchTerm.toLowerCase());
+                          c.nic.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = filterStatus === 'all' || c.kyc_status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const fetchCustomers = async () => {
     try {
-      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/customers`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`);
       setCustomers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error(err);
@@ -75,28 +96,50 @@ const Customers = () => {
     fetchCustomers();
   }, []);
 
+  const handleLocationDropdownChange = (val) => {
+    if (val === 'custom') {
+      setIsCustomLoc(true);
+      setFormData(prev => ({ ...prev, location: '', location_code: '' }));
+    } else {
+      setIsCustomLoc(false);
+      const matched = PREDEFINED_LOCATIONS.find(l => l.name === val);
+      if (matched) {
+        setFormData(prev => ({ ...prev, location: matched.name, location_code: matched.code }));
+      }
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setError('');
     try {
       if (editMode) {
-        await axios.put(`\https://gallecredit-a9a2.vercel.app/api/customers/${selectedCustomerId}`, formData);
+        await axios.put(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}`, formData);
       } else {
-        await axios.post(`\https://gallecredit-a9a2.vercel.app/api/customers`, formData);
+        await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`, formData);
       }
       closeModal();
       fetchCustomers();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save customer');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleEdit = (customer) => {
+    const isPredefined = PREDEFINED_LOCATIONS.some(l => l.name === customer.location);
+    setIsCustomLoc(!isPredefined && customer.location !== 'Galle');
     setFormData({
       name: customer.name,
       nic: customer.nic,
       phone: customer.phone,
       address: customer.address,
-      kyc_status: customer.kyc_status || 'pending'
+      kyc_status: customer.kyc_status || 'pending',
+      location: customer.location || 'Galle',
+      location_code: customer.location_code || 'GL'
     });
     setSelectedCustomerId(customer.customer_id);
     setEditMode(true);
@@ -107,7 +150,16 @@ const Customers = () => {
     setShowModal(false);
     setEditMode(false);
     setSelectedCustomerId(null);
-    setFormData({ name: '', nic: '', phone: '', address: '', kyc_status: 'pending' });
+    setFormData({ 
+      name: '', 
+      nic: '', 
+      phone: '', 
+      address: '', 
+      kyc_status: 'pending',
+      location: 'Galle',
+      location_code: 'GL'
+    });
+    setIsCustomLoc(false);
     setError('');
   };
 
@@ -175,6 +227,7 @@ const Customers = () => {
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Name</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">NIC</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Phone</th>
+                  <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Location</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">KYC Status</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
@@ -185,6 +238,7 @@ const Customers = () => {
                     <td className="py-5 px-6 text-sm font-bold text-slate-800">{c.name}</td>
                     <td className="py-5 px-6 text-sm text-slate-600 font-medium">{c.nic}</td>
                     <td className="py-5 px-6 text-sm text-slate-600 font-medium">{c.phone}</td>
+                    <td className="py-5 px-6 text-sm text-slate-600 font-semibold">{c.location || 'Galle'} ({c.location_code || 'GL'})</td>
                     <td className="py-5 px-6 text-sm">{getKYCBadge(c.kyc_status)}</td>
                     <td className="py-5 px-6 text-right">
                       <div className="flex justify-end gap-2">
@@ -213,7 +267,7 @@ const Customers = () => {
                 ))}
                 {filteredCustomers.length === 0 && (
                   <tr>
-                    <td colSpan="5" className="py-12 text-center text-slate-400 font-medium">No customers found matching your criteria.</td>
+                    <td colSpan="6" className="py-12 text-center text-slate-400 font-medium">No customers found matching your criteria.</td>
                   </tr>
                 )}
               </tbody>
@@ -231,7 +285,7 @@ const Customers = () => {
                 <h3 className="text-lg font-bold text-slate-900">{editMode ? 'Edit Customer' : 'Add New Customer'}</h3>
                 <p className="text-sm text-slate-500 font-medium mt-1">Fill in the customer details below.</p>
               </div>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full" disabled={isSubmitting}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
@@ -239,31 +293,85 @@ const Customers = () => {
               {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-xl font-medium">{error}</div>}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Name</label>
-                <input required type="text" className="premium-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                <input required disabled={isSubmitting} type="text" className="premium-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">NIC</label>
-                <input required type="text" className="premium-input" value={formData.nic} onChange={e => setFormData({...formData, nic: e.target.value})} />
+                <input required disabled={isSubmitting} type="text" className="premium-input" value={formData.nic} onChange={e => setFormData({...formData, nic: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Phone</label>
-                <input required type="text" className="premium-input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                <input required disabled={isSubmitting} type="text" className="premium-input" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">KYC Status</label>
-                <select className="premium-input bg-white" value={formData.kyc_status} onChange={e => setFormData({...formData, kyc_status: e.target.value})}>
+                <select 
+                  disabled={isStaff || isSubmitting} 
+                  className={`premium-input bg-white ${(isStaff || isSubmitting) ? 'opacity-75 cursor-not-allowed bg-slate-50' : ''}`}
+                  value={formData.kyc_status} 
+                  onChange={e => setFormData({...formData, kyc_status: e.target.value})}
+                >
                   <option value="pending">Pending</option>
                   <option value="verified">Verified</option>
                   <option value="rejected">Rejected</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Location</label>
+                <select 
+                  required
+                  disabled={isSubmitting}
+                  className="premium-input bg-white"
+                  value={isCustomLoc ? 'custom' : formData.location}
+                  onChange={e => handleLocationDropdownChange(e.target.value)}
+                >
+                  {PREDEFINED_LOCATIONS.map(l => (
+                    <option key={l.name} value={l.name}>{l.name} ({l.code})</option>
+                  ))}
+                  <option value="custom">Other (Custom)</option>
+                </select>
+              </div>
+
+              {isCustomLoc && (
+                <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-5 duration-200">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Custom Location</label>
+                    <input 
+                      required 
+                      disabled={isSubmitting}
+                      type="text" 
+                      placeholder="e.g. Matara"
+                      className="premium-input py-2 text-sm" 
+                      value={formData.location} 
+                      onChange={e => setFormData({...formData, location: e.target.value})} 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">Custom Code (2-3 Chars)</label>
+                    <input 
+                      required 
+                      disabled={isSubmitting}
+                      type="text" 
+                      placeholder="e.g. MT"
+                      maxLength={5}
+                      className="premium-input py-2 text-sm uppercase" 
+                      value={formData.location_code} 
+                      onChange={e => setFormData({...formData, location_code: e.target.value.toUpperCase()})} 
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Address</label>
-                <textarea required className="premium-input resize-none" rows="3" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})}></textarea>
+                <textarea required disabled={isSubmitting} className="premium-input resize-none" rows="3" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})}></textarea>
               </div>
               <div className="pt-2 flex gap-4">
-                <button type="button" onClick={closeModal} className="flex-1 secondary-btn">Cancel</button>
-                <button type="submit" className="flex-1 premium-btn">{editMode ? 'Update Changes' : 'Save Customer'}</button>
+                <button type="button" onClick={closeModal} className="flex-1 secondary-btn" disabled={isSubmitting}>Cancel</button>
+                <button type="submit" className="flex-1 premium-btn" disabled={isSubmitting}>
+                  {isSubmitting ? 'Saving...' : editMode ? 'Update Changes' : 'Save Customer'}
+                </button>
               </div>
             </form>
           </div>
@@ -300,7 +408,7 @@ const Customers = () => {
                       <p className="text-xs text-slate-500 font-medium mt-0.5">{new Date(doc.uploaded_at).toLocaleDateString()}</p>
                     </div>
                     <a 
-                      href={doc.file_path.startsWith('http') ? doc.file_path : `\https://gallecredit-a9a2.vercel.app/uploads/${doc.file_name}`} 
+                      href={doc.file_path.startsWith('http') ? doc.file_path : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/uploads/${doc.file_name}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="text-primary-600 hover:text-primary-700 text-sm font-bold hover:underline"
@@ -333,6 +441,3 @@ const Customers = () => {
 };
 
 export default Customers;
-
-
-

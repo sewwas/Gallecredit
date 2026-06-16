@@ -32,15 +32,15 @@ const Vaults = () => {
 
       if (isAdminOrAccountant) {
         const [vaultsRes, pendingRes] = await Promise.all([
-          axios.get(`\https://gallecredit-a9a2.vercel.app/api/vaults`, config),
-          axios.get(`\https://gallecredit-a9a2.vercel.app/api/vaults/handovers/pending`, config)
+          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults`, config),
+          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handovers/pending`, config)
         ]);
         setVaults(vaultsRes.data);
         setPendingHandovers(pendingRes.data);
       }
 
       // Always fetch personal drawer
-      const drawerRes = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/vaults/my-drawer`, config);
+      const drawerRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/my-drawer`, config);
       setMyDrawer(drawerRes.data);
     } catch (err) {
       console.error(err);
@@ -72,14 +72,14 @@ const Vaults = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/vaults/handover`, { amount: handoverAmount }, config);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handover`, { amount: handoverAmount }, config);
       setSuccessMsg('Handover request submitted successfully!');
       setHandoverAmount('');
       // Refresh personal drawer
-      const drawerRes = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/vaults/my-drawer`, config);
+      const drawerRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/my-drawer`, config);
       setMyDrawer(drawerRes.data);
       if (isAdminOrAccountant) {
-        const pendingRes = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/vaults/handovers/pending`, config);
+        const pendingRes = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handovers/pending`, config);
         setPendingHandovers(pendingRes.data);
       }
     } catch (err) {
@@ -97,7 +97,7 @@ const Vaults = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      await axios.post(`\https://gallecredit-a9a2.vercel.app/api/vaults/handovers/${id}/resolve`, { action }, config);
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/handovers/${id}/resolve`, { action }, config);
       setSuccessMsg(`Handover request ${action === 'approved' ? 'approved' : 'rejected'} successfully!`);
       // Reload
       await fetchVaultsData();
@@ -135,8 +135,12 @@ const Vaults = () => {
       {/* Header Info */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-sm font-bold uppercase tracking-wider text-slate-500">Liquidity & Vaults</span>
-          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Branch Cash Vaults</h2>
+          <span className="text-sm font-bold uppercase tracking-wider text-slate-500">
+            {isAdminOrAccountant ? 'Liquidity & Vaults' : 'Cash Handover Console'}
+          </span>
+          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+            {isAdminOrAccountant ? 'Branch Cash Vaults' : 'My Cash Drawer'}
+          </h2>
         </div>
         <button
           onClick={fetchVaultsData}
@@ -191,10 +195,10 @@ const Vaults = () => {
       )}
 
       {/* Main Split Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className={`grid grid-cols-1 ${isAdminOrAccountant ? 'lg:grid-cols-3' : 'max-w-xl mx-auto w-full'} gap-8`}>
         
         {/* LEFT COLUMN: Personal Drawer and Handover Submission */}
-        <div className="lg:col-span-1 space-y-6">
+        <div className={`${isAdminOrAccountant ? 'lg:col-span-1' : 'w-full'} space-y-6`}>
           {/* My Drawer Card */}
           <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-6">
             <div>

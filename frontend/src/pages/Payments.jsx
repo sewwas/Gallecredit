@@ -22,9 +22,13 @@ const Payments = () => {
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastPaymentDetails, setLastPaymentDetails] = useState(null);
 
+  const [filterLocation, setFilterLocation] = useState('all');
+  const [filterProgress, setFilterProgress] = useState('all');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const fetchLoans = async () => {
     try {
-      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/loans`);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`);
       setLoans(Array.isArray(res.data) ? res.data.filter(l => l.status === 'disbursed') : []);
     } catch (err) {
       console.error(err);
@@ -38,7 +42,7 @@ const Payments = () => {
       const config = {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       };
-      const res = await axios.get(`\https://gallecredit-a9a2.vercel.app/api/vaults/my-drawer`, config);
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/vaults/my-drawer`, config);
       setDrawerBalance(parseFloat(res.data.current_balance || 0));
     } catch (err) {
       console.error('Failed to load collector drawer balance', err);
@@ -52,7 +56,7 @@ const Payments = () => {
 
   useEffect(() => {
     if (selectedLoanId) {
-      axios.get(`\https://gallecredit-a9a2.vercel.app/api/installments/loan/${selectedLoanId}`)
+      axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/installments/loan/${selectedLoanId}`)
         .then(res => {
           setAllInstallments(Array.isArray(res.data) ? res.data : []);
           setInstallments(Array.isArray(res.data) ? res.data.filter(i => i.status !== 'paid') : []);
@@ -61,7 +65,7 @@ const Payments = () => {
 
       const selectedLoanObj = loans.find(l => l.loan_id == selectedLoanId);
       if (selectedLoanObj) {
-        axios.get(`\https://gallecredit-a9a2.vercel.app/api/customers/${selectedLoanObj.customer_id}`)
+        axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedLoanObj.customer_id}`)
           .then(res => setCustomerDetails(res.data))
           .catch(err => console.error(err));
       }
@@ -94,15 +98,83 @@ const Payments = () => {
   const parsedEnteredAmount = parseFloat(paymentData.amount) || 0;
   const progressPercent = totalDueWithInterest > 0 ? Math.round((totalPaidSoFar / totalDueWithInterest) * 100) : 0;
 
+  const handlePresetSelect = (val) => {
+    setPaymentData({
+      ...paymentData,
+      amount: parseFloat(val).toFixed(2)
+    });
+  };
+
+  const getPresetAmountForCount = (count) => {
+    if (!paymentData.installment_id) return 0;
+    const selectedIdx = allInstallments.findIndex(i => i.installment_id == paymentData.installment_id);
+    if (selectedIdx === -1) return 0;
+    
+    const eligible = allInstallments.slice(selectedIdx).filter(i => i.status !== 'paid' || i.installment_id == paymentData.installment_id);
+    
+    let sum = 0;
+    const targets = eligible.slice(0, count);
+    targets.forEach((inst, index) => {
+      const remainingDue = parseFloat(inst.amount) - (index === 0 ? parseFloat(inst.paid_amount || 0) : 0);
+      sum += remainingDue;
+    });
+    return sum;
+  };
+
+  const getOverpaymentBreakdown = () => {
+    if (!paymentData.installment_id || parsedEnteredAmount <= selectedInstallmentRemaining) {
+      return null;
+    }
+    
+    let remaining = parsedEnteredAmount;
+    const breakdown = [];
+    
+    const selectedIdx = allInstallments.findIndex(i => i.installment_id == paymentData.installment_id);
+    if (selectedIdx === -1) return null;
+    
+    const eligibleInstallments = allInstallments.slice(selectedIdx).map((inst, index) => ({
+      ...inst,
+      overallIndex: selectedIdx + index + 1,
+      remainingDue: parseFloat(inst.amount) - parseFloat(inst.paid_amount || 0)
+    })).filter(i => i.status !== 'paid' || i.installment_id == paymentData.installment_id);
+
+    for (let inst of eligibleInstallments) {
+      if (remaining <= 0) break;
+      
+      const allocated = Math.min(remaining, inst.remainingDue);
+      const newPaid = parseFloat(inst.paid_amount || 0) + allocated;
+      const isFullyPaid = newPaid >= parseFloat(inst.amount);
+      
+      breakdown.push({
+        overallIndex: inst.overallIndex,
+        dueDate: inst.due_date,
+        amount: inst.amount,
+        allocated: allocated,
+        status: isFullyPaid ? 'paid' : 'partial'
+      });
+      
+      remaining -= allocated;
+    }
+    
+    let excessRemaining = remaining;
+    
+    return {
+      breakdown,
+      excessRemaining
+    };
+  };
+
   const handlePayment = async (e) => {
     e.preventDefault();
     if (!paymentData.installment_id) {
       alert('Please select an installment to log a payment');
       return;
     }
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
     try {
-      const res = await axios.post(`\https://gallecredit-a9a2.vercel.app/api/payments`, {
+      const res = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/payments`, {
         loan_id: selectedLoanId,
         ...paymentData
       });
@@ -113,7 +185,7 @@ const Payments = () => {
       // Store payment details to show on the receipt modal
       setLastPaymentDetails({
         payment_id: paymentInfo.payment_id,
-        amount: parseFloat(paymentInfo.amount),
+        amount: parseFloat(paymentInfo.total_amount),
         method: paymentInfo.method,
         payment_date: paymentInfo.payment_date,
         customerName: selectedLoan?.customer_name || 'N/A',
@@ -124,10 +196,11 @@ const Payments = () => {
         installmentDue: selectedInstallment ? parseFloat(selectedInstallment.amount) : 0,
         installmentPaidBefore: selectedInstallment ? parseFloat(selectedInstallment.paid_amount) : 0,
         remainingInstallmentBalance: selectedInstallment 
-          ? parseFloat(selectedInstallment.amount) - (parseFloat(selectedInstallment.paid_amount) + parseFloat(paymentInfo.amount))
+          ? Math.max(0, selectedInstallmentRemaining - parseFloat(paymentInfo.total_amount))
           : 0,
-        newLoanOutstanding: totalOutstandingBalance - parseFloat(paymentInfo.amount),
-        collectorName: user ? user.name : 'System Collector'
+        newLoanOutstanding: totalOutstandingBalance - parseFloat(paymentInfo.total_amount),
+        collectorName: user ? user.name : 'System Collector',
+        allocations: paymentInfo.allocations || []
       });
 
       setShowReceiptModal(true);
@@ -143,13 +216,48 @@ const Payments = () => {
 
     } catch (err) {
       alert(err.response?.data?.error || 'Failed to record payment');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const filteredLoans = loans.filter(l => 
-    l.customer_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    l.loan_id.toString().includes(searchQuery)
+  const uniqueLocations = Array.from(
+    new Set(loans.map(l => l.customer_location).filter(Boolean))
   );
+
+  const filteredLoans = loans.filter(l => {
+    // 1. Search Query
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = l.customer_name.toLowerCase().includes(query) ||
+                          l.loan_id.toString().includes(query) ||
+                          (l.loan_code && l.loan_code.toLowerCase().includes(query));
+
+    if (!matchesSearch) return false;
+
+    // 2. Location
+    if (filterLocation !== 'all' && l.customer_location !== filterLocation) {
+      return false;
+    }
+
+    // 3. Progress
+    if (filterProgress !== 'all') {
+      const totalAmount = parseFloat(l.total_installments_amount || 0);
+      const totalPaid = parseFloat(l.total_paid || 0);
+      const progress = totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
+
+      if (filterProgress === 'not_paid') {
+        if (totalPaid > 0) return false;
+      } else if (filterProgress === 'partial') {
+        if (progress === 0 || progress >= 50) return false;
+      } else if (filterProgress === 'mostly') {
+        if (progress < 50 || progress >= 100) return false;
+      } else if (filterProgress === 'fully') {
+        if (progress < 100) return false;
+      }
+    }
+
+    return true;
+  });
 
   return (
     <div className="space-y-8 pb-12">
@@ -198,6 +306,37 @@ const Payments = () => {
               />
             </div>
 
+            {/* Extra Dropdowns for Filters */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Location</label>
+                <select 
+                  className="premium-input bg-white text-xs py-2"
+                  value={filterLocation}
+                  onChange={(e) => setFilterLocation(e.target.value)}
+                >
+                  <option value="all">All Locations</option>
+                  {uniqueLocations.map(loc => (
+                    <option key={loc} value={loc}>{loc}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1">Repayment</label>
+                <select 
+                  className="premium-input bg-white text-xs py-2"
+                  value={filterProgress}
+                  onChange={(e) => setFilterProgress(e.target.value)}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="not_paid">Not Paid (0%)</option>
+                  <option value="partial">Partially Paid (&lt;50%)</option>
+                  <option value="mostly">Mostly Paid (&ge;50%)</option>
+                  <option value="fully">Fully Repaid (100%)</option>
+                </select>
+              </div>
+            </div>
+
             <div className="max-h-[55vh] overflow-y-auto space-y-2.5 pr-1 divide-y divide-slate-100/50">
               {loading ? (
                 <div className="flex justify-center py-6">
@@ -217,7 +356,7 @@ const Payments = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-bold text-slate-800 text-sm tracking-tight">{l.customer_name}</p>
-                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Loan ID: #{l.loan_id}</p>
+                        <p className="text-[10px] text-primary-600 font-extrabold uppercase mt-0.5">{l.loan_code || `L-${l.loan_id}`}</p>
                       </div>
                       {selectedLoanId == l.loan_id && (
                         <span className="bg-primary-600 text-white p-1 rounded-full shadow-sm animate-in zoom-in">
@@ -351,15 +490,10 @@ const Payments = () => {
                     </div>
                     <div className="space-y-1">
                       <h3 className="text-xl font-extrabold text-slate-900 tracking-tight leading-none">{selectedLoan.customer_name}</h3>
-                      {customerDetails ? (
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                          NIC Reference: {customerDetails.nic} | Mobile: {customerDetails.phone}
-                        </p>
-                      ) : (
-                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                          Loan Reference: #{selectedLoanId}
-                        </p>
-                      )}
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mt-1">
+                        Code: <span className="text-primary-600 font-black">{selectedLoan.loan_code || `L-${selectedLoan.loan_id}`}</span>
+                        {customerDetails && ` | NIC: ${customerDetails.nic} | Mobile: ${customerDetails.phone}`}
+                      </p>
                     </div>
                   </div>
                   
@@ -559,18 +693,18 @@ const Payments = () => {
                         </div>
                       )}
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                      <div className="space-y-6">
                         
-                        {/* Amount Entry with Live Helper presets */}
-                        <div className="space-y-3">
-                          <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">Amount to Collect (Rs.)</label>
+                        {/* Amount Entry with Live Helper presets (HIGHER PROMINENCE) */}
+                        <div className="bg-slate-50 border border-slate-200/60 rounded-[24px] p-6.5 space-y-4">
+                          <label className="block text-xs font-black text-slate-500 uppercase tracking-widest">Amount to Collect (Rs.)</label>
                           <div className="relative">
-                            <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 font-bold text-sm">Rs.</span>
+                            <span className="absolute inset-y-0 left-0 pl-5 flex items-center text-slate-400 font-extrabold text-2xl">Rs.</span>
                             <input 
                               required 
                               type="number" 
                               step="0.01" 
-                              className="premium-input pl-11 text-base font-bold" 
+                              className="w-full bg-white border border-slate-200/80 rounded-2xl pl-16 pr-5 py-4 text-3xl font-black text-slate-900 tracking-tight transition-all focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 placeholder-slate-300 outline-none" 
                               placeholder="0.00"
                               value={paymentData.amount}
                               onChange={(e) => setPaymentData({...paymentData, amount: e.target.value})}
@@ -580,21 +714,39 @@ const Payments = () => {
 
                           {/* Quick Preset Actions (One-click fills!) */}
                           {paymentData.installment_id && (
-                            <div className="flex gap-2 animate-in fade-in duration-300">
+                            <div className="flex flex-wrap gap-2 pt-1.5 animate-in fade-in duration-300">
                               <button
                                 type="button"
                                 onClick={() => handlePresetSelect(selectedInstallmentRemaining)}
-                                className="flex-1 py-2 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase rounded-xl transition-all"
+                                className="py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs uppercase rounded-xl transition-all shadow-sm"
                               >
-                                Pay Exact Due
+                                Exact Due
                               </button>
                               <button
                                 type="button"
                                 onClick={() => handlePresetSelect(selectedInstallmentRemaining / 2)}
-                                className="flex-1 py-2 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-extrabold text-[10px] uppercase rounded-xl transition-all"
+                                className="py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-extrabold text-xs uppercase rounded-xl transition-all shadow-sm"
                               >
                                 Pay Half
                               </button>
+                              {allInstallments.slice(allInstallments.findIndex(i => i.installment_id == paymentData.installment_id)).filter(i => i.status !== 'paid' || i.installment_id == paymentData.installment_id).length >= 2 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePresetSelect(getPresetAmountForCount(2))}
+                                  className="py-2.5 px-4 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/50 text-emerald-800 font-extrabold text-xs uppercase rounded-xl transition-all shadow-sm"
+                                >
+                                  Pay 2 Inst.
+                                </button>
+                              )}
+                              {allInstallments.slice(allInstallments.findIndex(i => i.installment_id == paymentData.installment_id)).filter(i => i.status !== 'paid' || i.installment_id == paymentData.installment_id).length >= 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handlePresetSelect(getPresetAmountForCount(3))}
+                                  className="py-2.5 px-4 bg-primary-50 hover:bg-primary-100 border border-primary-200/50 text-primary-800 font-extrabold text-xs uppercase rounded-xl transition-all shadow-sm"
+                                >
+                                  Pay 3 Inst.
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -602,7 +754,7 @@ const Payments = () => {
                         {/* Payment Method Selector (Highly modern button grids) */}
                         <div className="space-y-3">
                           <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">Repayment Channel</label>
-                          <div className="grid grid-cols-1 gap-2">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             {[
                               { val: 'cash', label: 'Cash Drawer', desc: 'AddToDrawer' },
                               { val: 'bank', label: 'Bank Transfer', desc: 'Direct Ledger' },
@@ -613,14 +765,14 @@ const Payments = () => {
                                 type="button"
                                 disabled={!paymentData.installment_id}
                                 onClick={() => setPaymentData({ ...paymentData, method: item.val })}
-                                className={`flex items-center justify-between p-3 rounded-xl border text-xs font-bold transition-all ${
+                                className={`flex flex-col items-start gap-1 p-4 rounded-2xl border transition-all ${
                                   paymentData.method === item.val
-                                    ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white border-slate-950 shadow-md scale-[1.01]'
-                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50/50'
+                                    ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white border-slate-950 shadow-md scale-[1.01]'
+                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50/50 hover:shadow-sm'
                                 } ${!paymentData.installment_id ? 'opacity-50 cursor-not-allowed' : ''}`}
                               >
-                                <span>{item.label}</span>
-                                <span className={`text-[9px] uppercase font-black px-1.5 py-0.5 rounded ${
+                                <span className="text-xs font-extrabold">{item.label}</span>
+                                <span className={`text-[9px] uppercase font-black px-2 py-0.5 rounded ${
                                   paymentData.method === item.val ? 'bg-primary-500 text-white' : 'bg-slate-100 text-slate-400'
                                 }`}>{item.desc}</span>
                               </button>
@@ -631,20 +783,59 @@ const Payments = () => {
                       </div>
 
                       {/* Warnings and Capping limit alerts */}
-                      {paymentData.installment_id && parsedEnteredAmount > selectedInstallmentRemaining && (
-                        <div className="p-4 bg-amber-50 border border-amber-200/60 rounded-2xl flex gap-3 text-amber-800 animate-in slide-in-from-bottom duration-200">
-                          <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div className="text-xs">
-                            <span className="font-extrabold block">Caution: Overpayment Registered</span>
-                            <span className="font-medium text-amber-700 block mt-0.5">
-                              The entered Rs. {parsedEnteredAmount.toLocaleString()} exceeds this installment's due sum (Rs. {selectedInstallmentRemaining.toLocaleString()}).
-                            </span>
-                            <span className="font-semibold text-amber-800 block mt-1">
-                              Double-entry rules will log the excess directly to the selected target. To pay multiple full installments, log separate entries respectively.
-                            </span>
+                      {(() => {
+                        const rolloverInfo = getOverpaymentBreakdown();
+                        if (!rolloverInfo) return null;
+                        return (
+                          <div className="p-4.5 bg-emerald-50 border border-emerald-200/60 rounded-2xl flex flex-col gap-3 text-slate-800 animate-in slide-in-from-bottom duration-200">
+                            <div className="flex gap-2.5 text-emerald-800">
+                              <Sparkles className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5 animate-pulse" />
+                              <div>
+                                <span className="font-extrabold block text-sm">Multi-Installment Rollover Active</span>
+                                <span className="font-semibold text-emerald-700 block mt-0.5 text-xs leading-normal">
+                                  Your payment of <strong>Rs. {parsedEnteredAmount.toLocaleString()}</strong> will automatically clear the selected installment and roll over to pay subsequent installments.
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div className="border-t border-emerald-200/50 pt-3.5 space-y-2">
+                              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider block">Estimated Amortization Allocation:</span>
+                              <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                                {rolloverInfo.breakdown.map((item, idx) => (
+                                  <div key={idx} className="flex justify-between items-center bg-white/75 border border-emerald-100/50 rounded-xl px-3 py-2 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-slate-700">Installment #{item.overallIndex}</span>
+                                      <span className="text-[10px] text-slate-400 font-medium">({new Date(item.dueDate).toLocaleDateString()})</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-slate-800">Rs. {item.allocated.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                        item.status === 'paid' ? 'bg-emerald-100 text-emerald-800 border border-emerald-200/30' : 'bg-amber-100 text-amber-800 border border-amber-200/30'
+                                      }`}>
+                                        {item.status === 'paid' ? 'Paid' : 'Partial'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                                {rolloverInfo.excessRemaining > 0 && (
+                                  <div className="flex justify-between items-center bg-white/75 border border-emerald-100/50 rounded-xl px-3 py-2 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-extrabold text-slate-750">Advance Overpayment</span>
+                                      <span className="text-[10px] text-slate-400 font-medium">(applied to last installment)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-slate-800">Rs. {rolloverInfo.excessRemaining.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                                      <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-primary-100 text-primary-800 border border-primary-200/30">
+                                        Advance
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       <div className="pt-2">
                         <button 
@@ -899,13 +1090,31 @@ const Payments = () => {
                       <span>AMOUNT RECEIVED:</span>
                       <span className="text-base text-emerald-700">Rs. {lastPaymentDetails.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
-
                     <div className="flex justify-between items-center text-xs font-bold text-slate-800 border-t border-dashed border-slate-200 pt-3">
-                      <span>Remaining Installment Balance:</span>
+                      <span>Remaining Selected Installment Balance:</span>
                       <span className={lastPaymentDetails.remainingInstallmentBalance <= 0 ? 'text-emerald-600 font-black' : 'text-slate-800'}>
                         Rs. {Math.max(0, lastPaymentDetails.remainingInstallmentBalance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </span>
                     </div>
+
+                    {/* Multi-installment breakdown detail */}
+                    {lastPaymentDetails.allocations && lastPaymentDetails.allocations.length > 0 && (
+                      <div className="border-t border-slate-100 pt-3 space-y-2">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Allocation Details</span>
+                        <div className="space-y-1.5 text-slate-600">
+                          {lastPaymentDetails.allocations.map((alloc, idx) => {
+                            const idxOverall = allInstallments.findIndex(inst => inst.installment_id == alloc.installment_id) + 1;
+                            const instNum = idxOverall > 0 ? `#${idxOverall}` : `ID ${alloc.installment_id}`;
+                            return (
+                              <div key={idx} className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                                <span>Applied to Installment {instNum}:</span>
+                                <span className="font-extrabold text-slate-800">Rs. {parseFloat(alloc.amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* HIGHLY EXPLICIT OUTSTANDING BALANCE (Shows exactly how much remaining to pay on the entire loan) */}

@@ -17,7 +17,7 @@ const Login = () => {
   const navigate = useNavigate();
 
   if (user) {
-    return <Navigate to="/" />;
+    return <Navigate to={user.role === 'staff' ? '/payments' : '/'} />;
   }
 
   const handleSubmit = async (e) => {
@@ -26,7 +26,6 @@ const Login = () => {
     setSuccess('');
     try {
       await login(username, password);
-      navigate('/');
     } catch (err) {
       setError(err.message || 'Invalid credentials');
     }
