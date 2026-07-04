@@ -21,6 +21,7 @@ const Payments = () => {
 
   const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [lastPaymentDetails, setLastPaymentDetails] = useState(null);
+  const [printFormat, setPrintFormat] = useState('thermal80');
 
   const [filterLocation, setFilterLocation] = useState('all');
   const [filterProgress, setFilterProgress] = useState('all');
@@ -945,7 +946,7 @@ const Payments = () => {
       {/* Complete Billing & Receipt Screen Redesign */}
       {showReceiptModal && lastPaymentDetails && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-50 overflow-y-auto animate-in fade-in duration-300 no-print-bg">
-          <div className="bg-white border border-slate-100 rounded-[32px] shadow-2xl w-full max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className={`bg-white border border-slate-100 rounded-[32px] shadow-2xl w-full max-w-2xl max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden animate-in zoom-in-95 duration-300 print-format-${printFormat}`}>
             
             <style>{`
               @media print {
@@ -956,14 +957,13 @@ const Payments = () => {
                 #print-receipt-content, #print-receipt-content * {
                   visibility: visible;
                 }
+                
+                /* Base Print Rules */
                 #print-receipt-content {
                   position: absolute;
                   left: 0;
                   top: 0;
-                  width: 100% !important;
-                  max-width: 100% !important;
                   margin: 0 !important;
-                  padding: 20px !important;
                   box-shadow: none !important;
                   border: none !important;
                   background: white !important;
@@ -971,6 +971,112 @@ const Payments = () => {
                 }
                 .no-print {
                   display: none !important;
+                }
+
+                /* A4 Format */
+                .print-format-a4 #print-receipt-content {
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  padding: 20px !important;
+                }
+
+                /* Thermal 80mm Format */
+                .print-format-thermal80 #print-receipt-content {
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  padding: 2mm !important;
+                  font-size: 12px !important;
+                  box-sizing: border-box !important;
+                }
+                @page {
+                  margin: 0;
+                }
+
+                /* Thermal 58mm Format */
+                .print-format-thermal58 #print-receipt-content {
+                  width: 100% !important;
+                  max-width: 100% !important;
+                  padding: 1mm !important;
+                  font-size: 11px !important;
+                  box-sizing: border-box !important;
+                }
+                
+                /* Utility for thermal to strip padding/margins and force compact layout */
+                .print-format-thermal80 *, .print-format-thermal58 * {
+                  box-sizing: border-box !important;
+                }
+                .print-format-thermal80 .p-8, .print-format-thermal58 .p-8 { padding: 4px !important; }
+                .print-format-thermal80 .p-5, .print-format-thermal58 .p-5 { padding: 2px !important; border-radius: 0 !important; }
+                .print-format-thermal80 .p-3.5, .print-format-thermal58 .p-3.5 { padding: 2px !important; }
+                .print-format-thermal80 .pb-4, .print-format-thermal58 .pb-4 { padding-bottom: 4px !important; }
+                .print-format-thermal80 .pt-6, .print-format-thermal58 .pt-6 { padding-top: 4px !important; }
+                .print-format-thermal80 .mt-6, .print-format-thermal58 .mt-6 { margin-top: 4px !important; }
+                
+                /* Extremely aggressive vertical space reduction */
+                .print-format-thermal80 .space-y-6 > :not([hidden]) ~ :not([hidden]), .print-format-thermal58 .space-y-6 > :not([hidden]) ~ :not([hidden]) { margin-top: 4px !important; }
+                .print-format-thermal80 .space-y-3.5 > :not([hidden]) ~ :not([hidden]), .print-format-thermal58 .space-y-3.5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0 !important; }
+                .print-format-thermal80 .space-y-2 > :not([hidden]) ~ :not([hidden]), .print-format-thermal58 .space-y-2 > :not([hidden]) ~ :not([hidden]) { margin-top: 0 !important; }
+                .print-format-thermal80 .space-y-1.5 > :not([hidden]) ~ :not([hidden]), .print-format-thermal58 .space-y-1.5 > :not([hidden]) ~ :not([hidden]) { margin-top: 0 !important; }
+                .print-format-thermal80 .pt-3, .print-format-thermal58 .pt-3 { padding-top: 1px !important; border-top-width: 1px !important; }
+                .print-format-thermal80 .pb-1.5, .print-format-thermal58 .pb-1.5 { padding-bottom: 0 !important; border-bottom-width: 0 !important; }
+                
+                /* Compress line heights in installment section */
+                .print-format-thermal80 .installment-row, .print-format-thermal58 .installment-row {
+                  line-height: 1.1 !important;
+                  margin-top: 1px !important;
+                }
+                
+                /* Center logo for thermal */
+                .print-format-thermal80 .print-logo, .print-format-thermal58 .print-logo {
+                  margin: 0 auto 4px auto !important;
+                }
+                .print-format-thermal80 .header-block, .print-format-thermal58 .header-block {
+                  text-align: center !important;
+                  display: block !important;
+                }
+                .print-format-thermal80 .header-block > div, .print-format-thermal58 .header-block > div {
+                  text-align: center !important;
+                  justify-content: center !important;
+                  width: 100% !important;
+                }
+                
+                /* Force logo visibility during print (browsers strip backgrounds) */
+                .print-logo {
+                  background: transparent !important;
+                }
+                .print-logo img {
+                  filter: grayscale(100%) brightness(1.4) contrast(0.8);
+                }
+                
+                /* Make fonts bigger globally for thermal to improve legibility */
+                .print-format-thermal80 .text-base, .print-format-thermal58 .text-base { font-size: 14px !important; }
+                .print-format-thermal80 .text-lg, .print-format-thermal58 .text-lg { font-size: 16px !important; }
+                .print-format-thermal80 .text-xs, .print-format-thermal58 .text-xs { font-size: 11px !important; }
+                .print-format-thermal80 .text-[10px], .print-format-thermal58 .text-[10px] { font-size: 11px !important; }
+                .print-format-thermal80 .text-[9px], .print-format-thermal58 .text-[9px] { font-size: 10px !important; }
+                .print-format-thermal80 .text-sm, .print-format-thermal58 .text-sm { font-size: 12px !important; }
+                
+                /* Make grid single column for narrow thermal paper */
+                .print-format-thermal80 .grid-cols-2, .print-format-thermal58 .grid-cols-2 { 
+                  grid-template-columns: 1fr !important; 
+                  gap: 2px !important; 
+                }
+                .print-format-thermal80 .grid-cols-2 > div, .print-format-thermal58 .grid-cols-2 > div { 
+                  display: flex; 
+                  flex-wrap: wrap;
+                  justify-content: space-between; 
+                  align-items: flex-start;
+                  border-bottom: 1px dashed #e2e8f0; 
+                  padding-bottom: 2px; 
+                  word-break: break-word;
+                }
+                .print-format-thermal80 .grid-cols-2 > div > span:first-child, .print-format-thermal58 .grid-cols-2 > div > span:first-child {
+                  margin-bottom: 0 !important;
+                  flex: 1 1 40%;
+                }
+                .print-format-thermal80 .grid-cols-2 > div > span:last-child, .print-format-thermal58 .grid-cols-2 > div > span:last-child {
+                  flex: 1 1 60%;
+                  text-align: right;
                 }
               }
             `}</style>
@@ -996,6 +1102,33 @@ const Payments = () => {
                 </div>
 
                 <div className="space-y-4 pt-8 md:pt-0 relative z-10">
+                  <div className="bg-slate-800/50 rounded-xl p-3 border border-slate-700/50">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-2">Print Format</label>
+                    <div className="flex gap-2">
+                      <button 
+                        type="button" 
+                        onClick={() => setPrintFormat('thermal80')}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${printFormat === 'thermal80' ? 'bg-primary-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                      >
+                        80mm
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setPrintFormat('thermal58')}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${printFormat === 'thermal58' ? 'bg-primary-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                      >
+                        58mm
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => setPrintFormat('a4')}
+                        className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${printFormat === 'a4' ? 'bg-primary-500 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                      >
+                        A4
+                      </button>
+                    </div>
+                  </div>
+
                   <button 
                     type="button" 
                     onClick={() => window.print()} 
@@ -1025,14 +1158,19 @@ const Payments = () => {
                 {/* Print content header */}
                 <div className="space-y-6">
                   {/* Company Logo Header */}
-                  <div className="flex justify-between items-start pb-4 border-b border-dashed border-slate-200">
-                    <div className="space-y-1">
-                      <h3 className="text-base font-black text-slate-900 tracking-tight leading-none block uppercase">GALLE CREDIT (PVT) LTD</h3>
-                      <p className="text-[9px] text-slate-500 font-black uppercase tracking-wider block mt-1">Official Repayment Receipt</p>
-                      <p className="text-[9px] text-slate-400">Head Office: No. 42, Wackwella Road, Galle</p>
+                  <div className="header-block flex justify-between items-start pb-4 border-b border-dashed border-slate-200">
+                    <div className="flex flex-col">
+                      <div className="w-14 h-14 flex items-center justify-center mb-2 print-logo mx-auto md:mx-0">
+                        <img src="/logo.jpg" alt="Galle Credit Logo" className="w-full h-full object-contain" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-base font-black text-slate-900 tracking-tight leading-none block uppercase">GALLE CREDIT (PVT) LTD</h3>
+                        <p className="text-[9px] text-slate-500 font-black uppercase tracking-wider block mt-1">Official Repayment Receipt</p>
+                        <p className="text-[9px] text-slate-400">Head Office: No. 42, Wackwella Road, Galle</p>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[9px] font-bold text-slate-400 uppercase block">Voucher No</span>
+                    <div className="text-right flex flex-col justify-end h-full">
+                      <span className="text-[9px] font-bold text-slate-400 uppercase block mt-2">Voucher No</span>
                       <span className="text-xs font-black text-slate-900">REC-{String(lastPaymentDetails.payment_id).padStart(6, '0')}</span>
                     </div>
                   </div>
@@ -1067,31 +1205,31 @@ const Payments = () => {
 
                   {/* Financial Ledger Calculation Block */}
                   <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-3.5 shadow-sm">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block border-b border-slate-100 pb-1.5">Installment Statement</span>
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block border-b border-slate-100 pb-1.5 installment-row">Installment Statement</span>
                     
-                    <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                    <div className="flex justify-between items-center text-xs font-semibold text-slate-500 installment-row">
                       <span>Installment Target:</span>
                       <span className="font-bold text-slate-800">
                         Installment #{lastPaymentDetails.installmentIndex}
                       </span>
                     </div>
 
-                    <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
-                      <span>Required Installment Value:</span>
+                    <div className="flex justify-between items-center text-xs font-semibold text-slate-500 installment-row">
+                      <span>Required Value:</span>
                       <span>Rs. {lastPaymentDetails.installmentDue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
 
-                    <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
+                    <div className="flex justify-between items-center text-xs font-semibold text-slate-500 installment-row">
                       <span>Paid Pre-repayment:</span>
                       <span>Rs. {lastPaymentDetails.installmentPaidBefore.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
 
-                    <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center text-sm font-black text-emerald-800">
-                      <span>AMOUNT RECEIVED:</span>
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center text-sm font-black text-emerald-800 installment-row">
+                      <span>RECEIVED:</span>
                       <span className="text-base text-emerald-700">Rs. {lastPaymentDetails.amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
-                    <div className="flex justify-between items-center text-xs font-bold text-slate-800 border-t border-dashed border-slate-200 pt-3">
-                      <span>Remaining Selected Installment Balance:</span>
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-800 border-t border-dashed border-slate-200 pt-3 installment-row">
+                      <span>Remaining Balance:</span>
                       <span className={lastPaymentDetails.remainingInstallmentBalance <= 0 ? 'text-emerald-600 font-black' : 'text-slate-800'}>
                         Rs. {Math.max(0, lastPaymentDetails.remainingInstallmentBalance).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                       </span>
@@ -1106,8 +1244,8 @@ const Payments = () => {
                             const idxOverall = allInstallments.findIndex(inst => inst.installment_id == alloc.installment_id) + 1;
                             const instNum = idxOverall > 0 ? `#${idxOverall}` : `ID ${alloc.installment_id}`;
                             return (
-                              <div key={idx} className="flex justify-between items-center text-xs font-semibold text-slate-500">
-                                <span>Applied to Installment {instNum}:</span>
+                              <div key={idx} className="flex justify-between items-center text-xs font-semibold text-slate-500 installment-row">
+                                <span>Applied to {instNum}:</span>
                                 <span className="font-extrabold text-slate-800">Rs. {parseFloat(alloc.amount).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                               </div>
                             );

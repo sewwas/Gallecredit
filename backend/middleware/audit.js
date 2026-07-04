@@ -47,4 +47,31 @@ const auditLog = async (req, res, next) => {
   next();
 };
 
-module.exports = { auditLog };
+/**
+ * Audit Report View Middleware
+ * Logs when a user views a specific financial report.
+ */
+const auditReportView = (reportName) => async (req, res, next) => {
+  try {
+    const userId = req.user ? (req.user.user_id || req.user.userId) : null;
+    
+    // Log asynchronously to not block the response
+    pool.query(
+      'INSERT INTO audit_logs (user_id, action, table_name, record_id, old_value, new_value) VALUES ($1, $2, $3, $4, $5, $6)',
+      [
+        userId,
+        'VIEW',
+        'reports',
+        null, // No specific record ID for aggregate reports
+        null,
+        JSON.stringify({ report: reportName, query: req.query })
+      ]
+    ).catch(err => console.error('Audit Report Log Error:', err));
+  } catch (err) {
+    console.error('Audit Report Middleware Error:', err);
+  }
+  
+  next();
+};
+
+module.exports = { auditLog, auditReportView };

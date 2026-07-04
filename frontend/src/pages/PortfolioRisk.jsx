@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert, TrendingDown, Percent, PiggyBank, RefreshCw, BarChart2, ShieldCheck } from 'lucide-react';
+import { ShieldAlert, TrendingDown, Percent, PiggyBank, RefreshCw, BarChart2, ShieldCheck, User } from 'lucide-react';
+import CustomerAuditModal from '../components/CustomerAuditModal';
 
 const PortfolioRisk = () => {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ const PortfolioRisk = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [auditCustomerId, setAuditCustomerId] = useState(null);
 
   const fetchRiskData = async () => {
     setLoading(true);
@@ -219,10 +221,10 @@ const PortfolioRisk = () => {
           <p className="text-xs text-slate-500 font-semibold">Exact risk profile, days past due, and bad debt provision per contract</p>
         </div>
 
-        {loans.length === 0 ? (
+        {loans.filter(l => l.overdue_days > 0).length === 0 ? (
           <div className="p-8 text-center text-slate-500 font-semibold">
             <ShieldCheck className="w-10 h-10 text-green-500 mx-auto mb-3" />
-            No active disbursed loans found. Outstanding portfolio is clear!
+            No overdue loans found. Outstanding portfolio is on track!
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -237,11 +239,22 @@ const PortfolioRisk = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {loans.map((loan) => (
+                {loans.filter(loan => loan.overdue_days > 0).map((loan) => (
                   <tr key={loan.loan_id} className="hover:bg-slate-50/40 transition-colors">
                     <td className="px-6 py-4">
-                      <p className="text-sm font-extrabold text-slate-900">{loan.customer_name}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Loan Contract ID: #{loan.loan_id} | Issued: Rs.{parseFloat(loan.loan_amount).toLocaleString()}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-extrabold text-slate-900">{loan.customer_name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase mt-0.5">Loan Contract ID: #{loan.loan_id} | Issued: Rs.{parseFloat(loan.loan_amount).toLocaleString()}</p>
+                        </div>
+                        <button 
+                          onClick={() => setAuditCustomerId(loan.customer_id)}
+                          className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 transition-colors font-medium text-[10px] uppercase tracking-wider"
+                          title="View Customer Audit Profile"
+                        >
+                          <User className="w-3 h-3" /> Profile
+                        </button>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
@@ -269,6 +282,13 @@ const PortfolioRisk = () => {
           </div>
         )}
       </div>
+
+      {/* Customer Audit Profile Modal */}
+      <CustomerAuditModal 
+        isOpen={!!auditCustomerId} 
+        customerId={auditCustomerId} 
+        onClose={() => setAuditCustomerId(null)} 
+      />
 
     </div>
   );

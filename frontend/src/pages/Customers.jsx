@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit2, Trash2, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, Clock, AlertCircle, User } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import CustomerAuditModal from '../components/CustomerAuditModal';
 
 const PREDEFINED_LOCATIONS = [
   { name: 'Galle', code: 'GL' },
@@ -36,6 +37,7 @@ const Customers = () => {
   const [uploading, setUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCustomLoc, setIsCustomLoc] = useState(false);
+  const [auditCustomerId, setAuditCustomerId] = useState(null);
 
   useEffect(() => {
     if (viewingDocs && selectedCustomerId) {
@@ -254,6 +256,13 @@ const Customers = () => {
                           Docs
                         </button>
                         <button 
+                          onClick={() => setAuditCustomerId(c.customer_id)}
+                          className="flex items-center gap-1 text-emerald-600 hover:text-emerald-700 px-3 py-1.5 rounded-lg border border-emerald-200 hover:border-emerald-300 bg-emerald-50 hover:bg-emerald-100 transition-all font-medium text-xs"
+                          title="Full Audit Profile"
+                        >
+                          <User className="w-3 h-3" /> Profile
+                        </button>
+                        <button 
                           onClick={() => handleEdit(c)}
                           className="flex items-center gap-1 text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-all font-medium text-xs"
                           title="Edit"
@@ -436,6 +445,14 @@ const Customers = () => {
           </div>
         </div>
       )}
+
+      {/* Customer Audit Profile Modal */}
+      <CustomerAuditModal 
+        isOpen={!!auditCustomerId} 
+        customerId={auditCustomerId} 
+        onClose={() => setAuditCustomerId(null)} 
+      />
+
     </div>
   );
 };

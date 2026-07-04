@@ -2,13 +2,14 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
+const { auditReportView } = require('../middleware/audit');
 
 router.use(authenticateToken);
 // Only allow admin and accountant to view reports
 router.use(authorizeRole('admin', 'accountant'));
 
 // Daily Collection Report
-router.get('/daily-collection', async (req, res) => {
+router.get('/daily-collection', auditReportView('daily_collection'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT SUM(amount) as total_collection 
@@ -23,15 +24,21 @@ router.get('/daily-collection', async (req, res) => {
 });
 
 // Outstanding Loans Report
-router.get('/outstanding', async (req, res) => {
+router.get('/outstanding', auditReportView('outstanding_loans'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT l.loan_id, c.name, l.total_amount, 
-             COALESCE((SELECT SUM(paid_amount) FROM installments WHERE loan_id = l.loan_id), 0) as total_paid,
-             (l.total_amount - COALESCE((SELECT SUM(paid_amount) FROM installments WHERE loan_id = l.loan_id), 0)) as outstanding_balance
+             COALESCE(i.total_paid, 0) as total_paid,
+             (l.total_amount - COALESCE(i.total_paid, 0)) as outstanding_balance
       FROM loans l
       JOIN customers c ON l.customer_id = c.customer_id
-      WHERE l.status = 'active'
+      LEFT JOIN (
+          SELECT loan_id, SUM(paid_amount) as total_paid 
+          FROM installments 
+          GROUP BY loan_id
+      ) i ON l.loan_id = i.loan_id
+      WHERE l.status = 'disbursed'
+      AND (l.total_amount - COALESCE(i.total_paid, 0)) > 0
     `);
     res.json(result.rows);
   } catch (err) {
@@ -41,24 +48,21 @@ router.get('/outstanding', async (req, res) => {
 });
 
 // Profit Loss Report (Simplified: Interest - Expenses)
-router.get('/profit-loss', async (req, res) => {
+router.get('/profit-loss', auditReportView('profit_loss'), async (req, res) => {
   try {
     const result = await pool.query(`
       WITH 
-      TotalInterest AS (
-        SELECT SUM(l.total_amount - l.loan_amount) as interest FROM loans l
-      ),
-      TotalExpenses AS (
-        SELECT SUM(amount) as expenses FROM expenses
-      ),
-      OtherIncome AS (
-        SELECT SUM(amount) as income FROM income
-      )
+      TotalInterest AS (SELECT COALESCE(SUM(total_amount - loan_amount), 0) as interest FROM loans),
+      TotalExpenses AS (SELECT COALESCE(SUM(amount), 0) as expenses FROM expenses),
+      OtherIncome AS (SELECT COALESCE(SUM(amount), 0) as income FROM income)
       SELECT 
-        COALESCE((SELECT interest FROM TotalInterest), 0) as expected_interest,
-        COALESCE((SELECT expenses FROM TotalExpenses), 0) as total_expenses,
-        COALESCE((SELECT income FROM OtherIncome), 0) as other_income,
-        (COALESCE((SELECT interest FROM TotalInterest), 0) + COALESCE((SELECT income FROM OtherIncome), 0) - COALESCE((SELECT expenses FROM TotalExpenses), 0)) as projected_profit
+        i.interest as expected_interest,
+        e.expenses as total_expenses,
+        o.income as other_income,
+        (i.interest + o.income - e.expenses) as projected_profit
+      FROM TotalInterest i
+      CROSS JOIN TotalExpenses e
+      CROSS JOIN OtherIncome o
     `);
     res.json(result.rows[0]);
   } catch (err) {
@@ -68,7 +72,7 @@ router.get('/profit-loss', async (req, res) => {
 });
 
 // Collection Trends (Last 7 days)
-router.get('/collection-trends', async (req, res) => {
+router.get('/collection-trends', auditReportView('collection_trends'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT DATE(payment_date) as date, SUM(amount) as amount
@@ -86,7 +90,7 @@ router.get('/collection-trends', async (req, res) => {
 
 
 // Loan Type Distribution
-router.get('/loan-distribution', async (req, res) => {
+router.get('/loan-distribution', auditReportView('loan_distribution'), async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT loan_type as name, COUNT(*) as value
