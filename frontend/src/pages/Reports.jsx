@@ -161,7 +161,7 @@ const Reports = () => {
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <TrendingUp size={12} className="text-emerald-500" /> Expected Interest
                   </p>
-                  <p className="text-xl font-black text-slate-800">Rs. {parseFloat(profitLoss.expected_interest).toLocaleString()}</p>
+                  <p className="text-xl font-black text-slate-800">Rs. {parseFloat(profitLoss.expected_interest || 0).toLocaleString()}</p>
                 </div>
                 
                 <div className="glass-panel p-5 border-b-4 border-b-amber-500 hover:shadow-lg transition-shadow relative overflow-hidden group">
@@ -171,7 +171,7 @@ const Reports = () => {
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <DollarSign size={12} className="text-amber-500" /> Other Income
                   </p>
-                  <p className="text-xl font-black text-slate-800">Rs. {parseFloat(profitLoss.other_income).toLocaleString()}</p>
+                  <p className="text-xl font-black text-slate-800">Rs. {parseFloat(profitLoss.other_income || 0).toLocaleString()}</p>
                 </div>
                 
                 <div className="glass-panel p-5 border-b-4 border-b-rose-500 hover:shadow-lg transition-shadow relative overflow-hidden group">
@@ -181,7 +181,7 @@ const Reports = () => {
                   <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <TrendingDown size={12} className="text-rose-500" /> Total Expenses
                   </p>
-                  <p className="text-xl font-black text-slate-800">Rs. {parseFloat(profitLoss.total_expenses).toLocaleString()}</p>
+                  <p className="text-xl font-black text-slate-800">Rs. {parseFloat(profitLoss.total_expenses || 0).toLocaleString()}</p>
                 </div>
                 
                 <div className="glass-panel p-5 border-b-4 border-b-primary-400 bg-slate-50 hover:shadow-lg transition-shadow relative overflow-hidden group">
@@ -191,17 +191,24 @@ const Reports = () => {
                   <p className="text-[10px] font-bold text-primary-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                     <PieChartIcon size={12} className="text-primary-500" /> Projected Profit
                   </p>
-                  <p className="text-xl font-black text-primary-800">Rs. {parseFloat(profitLoss.projected_profit).toLocaleString()}</p>
+                  <p className="text-xl font-black text-primary-800">Rs. {parseFloat(profitLoss.projected_profit || 0).toLocaleString()}</p>
                 </div>
 
-                <div className="glass-panel p-5 border-b-4 border-b-primary-600 bg-gradient-to-br from-primary-50 to-white hover:shadow-lg transition-shadow relative overflow-hidden group">
+                <div className="glass-panel p-5 border-b-4 border-b-primary-600 bg-gradient-to-br from-primary-50 to-white hover:shadow-lg transition-shadow relative overflow-hidden group flex flex-col justify-between">
                   <div className="absolute -right-4 -top-4 opacity-10 group-hover:opacity-20 transition-opacity">
                     <DollarSign size={80} className="text-primary-600" />
                   </div>
-                  <p className="text-[10px] font-bold text-primary-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                    <DollarSign size={12} className="text-primary-600" /> Actual Net Profit
-                  </p>
-                  <p className="text-2xl font-black text-primary-900">Rs. {parseFloat(profitLoss.actual_net_profit).toLocaleString()}</p>
+                  <div>
+                    <p className="text-[10px] font-bold text-primary-800 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                      <DollarSign size={12} className="text-primary-600" /> Actual Net Profit
+                    </p>
+                    <p className="text-2xl font-black text-primary-900">Rs. {parseFloat(profitLoss.actual_net_profit || 0).toLocaleString()}</p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-primary-100/50 text-[9px] text-primary-700 font-medium space-y-0.5">
+                    <div className="flex justify-between"><span>Realized Interest:</span> <span>Rs. {parseFloat(profitLoss.realized_interest || 0).toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Other Income:</span> <span>+ Rs. {parseFloat(profitLoss.other_income || 0).toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span>Total Expenses:</span> <span>- Rs. {parseFloat(profitLoss.total_expenses || 0).toLocaleString()}</span></div>
+                  </div>
                 </div>
               </>
             )}
