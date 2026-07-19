@@ -6,6 +6,54 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 router.use(authenticateToken);
 router.use(authorizeRole('admin', 'accountant'));
 
+// GET /status/:date/report - Full day summary audit log
+router.get('/status/:date/report', async (req, res) => {
+  const { date } = req.params;
+  try {
+    const status = await pool.query('SELECT d.*, u.username as closed_by_name FROM day_closes d LEFT JOIN users u ON d.closed_by_id = u.user_id WHERE date = $1', [date]);
+    if (status.rows.length === 0) {
+      return res.status(404).json({ error: 'This day is not closed yet' });
+    }
+
+    const cashbook = await pool.query('SELECT * FROM cash_book WHERE DATE(date) = $1 ORDER BY date ASC', [date]);
+
+    // Fetch journal entries with users
+    const journals = await pool.query(`
+      SELECT j.*, u.username as created_by_name 
+      FROM journal_entries j
+      LEFT JOIN users u ON j.created_by = u.user_id
+      WHERE DATE(j.transaction_date) = $1
+      ORDER BY j.transaction_date ASC
+    `, [date]);
+
+    const journalIds = journals.rows.map(j => j.journal_id);
+    let lines = [];
+    if (journalIds.length > 0) {
+      const linesQuery = await pool.query(`
+        SELECT l.*, c.account_name 
+        FROM journal_lines l
+        JOIN chart_of_accounts c ON l.account_code = c.account_code
+        WHERE l.journal_id = ANY($1)
+      `, [journalIds]);
+      lines = linesQuery.rows;
+    }
+
+    const journalsWithLines = journals.rows.map(j => ({
+      ...j,
+      lines: lines.filter(l => l.journal_id === j.journal_id)
+    }));
+
+    res.json({
+      dayStatus: status.rows[0],
+      cashbook: cashbook.rows,
+      journals: journalsWithLines
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Get Day Close Status and Summary
 router.get('/status/:date', async (req, res) => {
   const { date } = req.params;
@@ -89,10 +137,10 @@ router.get('/journals', async (req, res) => {
       ORDER BY je.transaction_date DESC, je.journal_id DESC, jl.line_id ASC
     `);
 
-    const journalsMap = {};
+    const journalsMap = new Map();
     result.rows.forEach(row => {
-      if (!journalsMap[row.journal_id]) {
-        journalsMap[row.journal_id] = {
+      if (!journalsMap.has(row.journal_id)) {
+        journalsMap.set(row.journal_id, {
           journal_id: row.journal_id,
           transaction_date: row.transaction_date,
           reference_source: row.reference_source,
@@ -100,9 +148,9 @@ router.get('/journals', async (req, res) => {
           description: row.description,
           operator_name: row.operator_name,
           lines: []
-        };
+        });
       }
-      journalsMap[row.journal_id].lines.push({
+      journalsMap.get(row.journal_id).lines.push({
         line_id: row.line_id,
         account_code: row.account_code,
         account_name: row.account_name,
@@ -111,7 +159,7 @@ router.get('/journals', async (req, res) => {
       });
     });
 
-    res.json(Object.values(journalsMap));
+    res.json(Array.from(journalsMap.values()));
   } catch (err) {
     console.error('Failed to fetch journal lines:', err);
     res.status(500).json({ error: 'Internal server error' });

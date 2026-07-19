@@ -80,6 +80,10 @@ router.post('/', async (req, res) => {
     guarantor_nic, 
     guarantor_phone, 
     guarantor_address,
+    guarantor2_name,
+    guarantor2_nic,
+    guarantor2_phone,
+    guarantor2_address,
     grace_period_days,
     penalty_rate
   } = req.body;
@@ -197,11 +201,19 @@ router.post('/', async (req, res) => {
       [loanId, req.user.userId]
     );
 
-    // Insert Guarantor (if provided)
+    // Insert Guarantor 1 (if provided)
     if (guarantor_name && guarantor_nic) {
       await client.query(
         'INSERT INTO guarantors (loan_id, name, nic, phone, address) VALUES ($1, $2, $3, $4, $5)',
         [loanId, guarantor_name, guarantor_nic, guarantor_phone, guarantor_address]
+      );
+    }
+
+    // Insert Guarantor 2 (if provided)
+    if (guarantor2_name && guarantor2_nic) {
+      await client.query(
+        'INSERT INTO guarantors (loan_id, name, nic, phone, address) VALUES ($1, $2, $3, $4, $5)',
+        [loanId, guarantor2_name, guarantor2_nic, guarantor2_phone, guarantor2_address]
       );
     }
 

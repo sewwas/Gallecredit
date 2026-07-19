@@ -17,6 +17,7 @@ const Dashboard = () => {
   });
   const [trends, setTrends] = useState([]);
   const [distribution, setDistribution] = useState([]);
+  const [expenseDistribution, setExpenseDistribution] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const COLORS = ['#8b5cf6', '#ec4899', '#f59e0b', '#ef4444'];
@@ -24,14 +25,15 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [customersRes, loansRes, dailyRes, outRes, trendsRes, distRes, profitRes] = await Promise.all([
+        const [customersRes, loansRes, dailyRes, outRes, trendsRes, distRes, profitRes, expenseRes] = await Promise.all([
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`).catch(() => ({ data: [] })),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/daily-collection`).catch(() => ({ data: { total_collection: 0 } })),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/outstanding`).catch(() => ({ data: [] })),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/collection-trends`).catch(() => ({ data: [] })),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/loan-distribution`).catch(() => ({ data: [] })),
-          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/profit-loss`).catch(() => ({ data: { projected_profit: 0, total_expenses: 0 } }))
+          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/profit-loss`).catch(() => ({ data: { projected_profit: 0, total_expenses: 0 } })),
+          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses/summary`).catch(() => ({ data: [] }))
         ]);
 
         const totalOutstanding = Array.isArray(outRes.data) 
@@ -60,6 +62,9 @@ const Dashboard = () => {
         setTrends(formattedTrends);
 
         setDistribution(Array.isArray(distRes.data) ? distRes.data : []);
+        
+        const expData = Array.isArray(expenseRes.data) ? expenseRes.data : [];
+        setExpenseDistribution(expData.map(e => ({ name: e.category, value: parseFloat(e.total_amount) })));
       } catch (err) {
         console.error("Failed to load dashboard data", err);
       } finally {
@@ -227,16 +232,36 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Info Card */}
-        <div className="glass-panel p-6 bg-gradient-to-br from-white to-slate-50 border-slate-100 flex flex-col justify-center">
-          <div className="w-12 h-12 bg-violet-100 rounded-full flex items-center justify-center text-violet-600 mb-4">
-            <Activity className="w-6 h-6" />
+        {/* Expense Breakdown Chart */}
+        <div className="glass-panel p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <PieIcon className="w-5 h-5 text-rose-600" />
+            <h3 className="text-lg font-bold text-slate-900">Expense Breakdown</h3>
           </div>
-          <h3 className="text-xl font-bold text-slate-900 mb-2">System Health & Status</h3>
-          <p className="text-slate-500 font-medium text-sm leading-relaxed">
-            Your microfinance management system is operating normally. All data shown is real-time and reflects current database states. 
-            Automated SMS and WhatsApp alerts are active for payment confirmations.
-          </p>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={expenseDistribution}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={80}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {expenseDistribution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', background: 'white' }}
+                   formatter={(value) => [`Rs. ${value.toLocaleString()}`, 'Expense']}
+                />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: '500' }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>

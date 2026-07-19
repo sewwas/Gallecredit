@@ -2,14 +2,29 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
-import { Plus, Lock, Unlock, CheckCircle2, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
+import { Plus, Lock, Unlock, CheckCircle2, TrendingUp, TrendingDown, Wallet, Printer, FileText, X } from 'lucide-react';
 
 
 const Accounting = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('cashbook');
   const [data, setData] = useState({ expenses: [], income: [], cashbook: [], accounts: [], journals: [] });
+  const [expenseSummary, setExpenseSummary] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [staffs, setStaffs] = useState([]);
+
+  useEffect(() => {
+    const fetchStaffs = async () => {
+      try {
+        const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users`, config);
+        setStaffs(res.data);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchStaffs();
+  }, []);
   
   // Day Close States
   const [dayCloseDate, setDayCloseDate] = useState(new Date().toISOString().split('T')[0]);
@@ -17,10 +32,14 @@ const Accounting = () => {
   const [closing, setClosing] = useState(false);
 
   const [showExpenseModal, setShowExpenseModal] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '' });
+  const [expenseForm, setExpenseForm] = useState({ date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', staff_name: '' });
 
   const [showIncomeModal, setShowIncomeModal] = useState(false);
   const [incomeForm, setIncomeForm] = useState({ date: new Date().toISOString().split('T')[0], source: '', amount: '' });
+
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportData, setReportData] = useState(null);
+  const [loadingReport, setLoadingReport] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -33,19 +52,23 @@ const Accounting = () => {
     try {
       if (activeTab === 'cashbook') {
         const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/cashbook`);
-        setData(prev => ({ ...prev, cashbook: res.data }));
+        setData(prev => ({ ...prev, cashbook: Array.isArray(res.data.data) ? res.data.data : res.data }));
       } else if (activeTab === 'expenses') {
-        const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`);
-        setData(prev => ({ ...prev, expenses: res.data }));
+        const [resExp, resSum] = await Promise.all([
+          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`),
+          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses/summary`)
+        ]);
+        setData(prev => ({ ...prev, expenses: Array.isArray(resExp.data.data) ? resExp.data.data : resExp.data }));
+        setExpenseSummary(resSum.data);
       } else if (activeTab === 'income') {
         const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/income`);
-        setData(prev => ({ ...prev, income: res.data }));
+        setData(prev => ({ ...prev, income: Array.isArray(res.data.data) ? res.data.data : res.data }));
       } else if (activeTab === 'accounts') {
         const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/accounts`);
-        setData(prev => ({ ...prev, accounts: res.data }));
+        setData(prev => ({ ...prev, accounts: Array.isArray(res.data.data) ? res.data.data : res.data }));
       } else if (activeTab === 'journals') {
         const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/journals`);
-        setData(prev => ({ ...prev, journals: res.data }));
+        setData(prev => ({ ...prev, journals: Array.isArray(res.data.data) ? res.data.data : res.data }));
       } else if (activeTab === 'dayclose') {
         await fetchDayStatus();
       }
@@ -91,14 +114,35 @@ const Accounting = () => {
     }
   };
 
+  const handleGenerateReport = async () => {
+    setLoadingReport(true);
+    setShowReportModal(true);
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/status/${dayCloseDate}/report`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      setReportData(res.data);
+    } catch (err) {
+      alert(err.response?.data?.error || 'Failed to load report');
+      setShowReportModal(false);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
   const handleExpenseSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`, expenseForm);
+      const payload = { ...expenseForm };
+      if ((payload.category === 'Salary' || payload.category === 'Allowance') && payload.staff_name) {
+        payload.description = `${payload.category} paid to ${payload.staff_name}: ${payload.description || ''}`;
+      }
+      const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`, payload, config);
       setShowExpenseModal(false);
-      setExpenseForm({ date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '' });
+      setExpenseForm({ date: new Date().toISOString().split('T')[0], category: '', amount: '', description: '', staff_name: '' });
       fetchData();
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to save expense');
@@ -125,12 +169,13 @@ const Accounting = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center print:hidden">
         <div>
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Accounting</h2>
           <p className="text-sm text-slate-500 font-medium mt-1">Manage expenses, income, and financial day-end procedures</p>
         </div>
         <div className="flex gap-3">
+
           {activeTab === 'expenses' && (
             <button onClick={() => setShowExpenseModal(true)} className="accent-btn">
               <Plus className="w-5 h-5" /> Add Expense
@@ -144,7 +189,7 @@ const Accounting = () => {
         </div>
       </div>
 
-      <div className="flex gap-2 p-1 bg-slate-100/80 backdrop-blur-sm rounded-xl border border-slate-200 overflow-x-auto max-w-full no-scrollbar">
+      <div className="flex gap-2 p-1 bg-slate-100/80 backdrop-blur-sm rounded-xl border border-slate-200 overflow-x-auto max-w-full no-scrollbar print:hidden">
         {[
           { id: 'cashbook', label: 'Cash Book' },
           { id: 'expenses', label: 'Expenses' },
@@ -167,7 +212,7 @@ const Accounting = () => {
         ))}
       </div>
 
-      <div className="glass-panel overflow-hidden">
+      <div className="glass-panel overflow-hidden print:hidden">
         {loading && activeTab !== 'dayclose' ? (
           <div className="flex justify-center items-center h-48">
             <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin"></div>
@@ -441,12 +486,23 @@ const Accounting = () => {
                     {closing ? 'Closing Day...' : 'Finalize & Close Day'}
                   </button>
                 ) : (
-                  <div className="p-8 rounded-2xl bg-green-50 border border-green-100 text-center">
-                    <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-                      <CheckCircle2 className="w-8 h-8" />
+                  <div className="p-8 rounded-2xl bg-green-50 border border-green-100 text-center flex flex-col items-center justify-center">
+                    <div className="flex items-center gap-4 mb-4 text-left">
+                      <div className="w-14 h-14 bg-green-100 text-green-600 rounded-full flex items-center justify-center shadow-sm shrink-0">
+                        <CheckCircle2 className="w-8 h-8" />
+                      </div>
+                      <div>
+                        <h4 className="text-xl font-bold text-green-800 mb-1">Accounting Verified</h4>
+                        <p className="text-sm text-green-600 font-medium">This day was finalized on {new Date(dayStatus.closeData.closed_at).toLocaleString()}</p>
+                      </div>
                     </div>
-                    <h4 className="text-xl font-bold text-green-800 mb-1">Accounting Verified</h4>
-                    <p className="text-sm text-green-600 font-medium">This day was finalized on {new Date(dayStatus.closeData.closed_at).toLocaleString()}</p>
+                    <button 
+                      onClick={handleGenerateReport} 
+                      className="mt-2 inline-flex items-center gap-2 px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg shadow-green-500/30 transition-all"
+                    >
+                      <FileText className="w-5 h-5" />
+                      Print Day Summary
+                    </button>
                   </div>
                 )}
               </div>
@@ -475,14 +531,32 @@ const Accounting = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Category</label>
-                <input required disabled={isSubmitting} type="text" className="premium-input" placeholder="e.g. Utility, Office Supply" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} />
+                <select required disabled={isSubmitting} className="premium-input" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})}>
+                  <option value="" disabled>Select Expense Category</option>
+                  <option value="Salary">Salary</option>
+                  <option value="Allowance">Allowance</option>
+                  <option value="Stamp">Stamp</option>
+                  <option value="Fuel">Fuel</option>
+                  <option value="Card">Card</option>
+                  <option value="Photocopy">Photocopy</option>
+                  <option value="Promissory">Promissory</option>
+                  <option value="Other">Other Operational Expense</option>
+                </select>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 font-medium">Rs.</span>
-                  <input required disabled={isSubmitting} type="number" step="0.01" className="premium-input pl-12" placeholder="0.00" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
+              {(expenseForm.category === 'Salary' || expenseForm.category === 'Allowance') && (
+                <div className="animate-in slide-in-from-top-2 fade-in duration-300">
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Select Employee / Staff</label>
+                  <select required disabled={isSubmitting} className="premium-input" value={expenseForm.staff_name} onChange={e => setExpenseForm({...expenseForm, staff_name: e.target.value})}>
+                    <option value="" disabled>Select Staff Member</option>
+                    {staffs.map(staff => (
+                      <option key={staff.user_id} value={staff.name}>{staff.name} ({staff.role})</option>
+                    ))}
+                  </select>
                 </div>
+              )}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Amount (Rs.)</label>
+                <input required disabled={isSubmitting} type="number" step="0.01" className="premium-input" placeholder="0.00" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
@@ -519,14 +593,17 @@ const Accounting = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Source</label>
-                <input required disabled={isSubmitting} type="text" className="premium-input" placeholder="e.g. Consultation Fee" value={incomeForm.source} onChange={e => setIncomeForm({...incomeForm, source: e.target.value})} />
+                <select required disabled={isSubmitting} className="premium-input" value={incomeForm.source} onChange={e => setIncomeForm({...incomeForm, source: e.target.value})}>
+                  <option value="" disabled>Select Income Source</option>
+                  <option value="Consultation Fee">Consultation Fee</option>
+                  <option value="Late Payment Penalty">Late Payment Penalty</option>
+                  <option value="Service Charge">Service Charge</option>
+                  <option value="Miscellaneous">Miscellaneous Income</option>
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 font-medium">Rs.</span>
-                  <input required disabled={isSubmitting} type="number" step="0.01" className="premium-input pl-12" placeholder="0.00" value={incomeForm.amount} onChange={e => setIncomeForm({...incomeForm, amount: e.target.value})} />
-                </div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Amount (Rs.)</label>
+                <input required disabled={isSubmitting} type="number" step="0.01" className="premium-input" placeholder="0.00" value={incomeForm.amount} onChange={e => setIncomeForm({...incomeForm, amount: e.target.value})} />
               </div>
               <div className="pt-2 flex gap-4">
                 <button type="button" onClick={() => setShowIncomeModal(false)} className="flex-1 secondary-btn" disabled={isSubmitting}>Cancel</button>
@@ -535,6 +612,101 @@ const Accounting = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Day Close Report Modal */}
+      {showReportModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300 print:bg-white print:static print:inset-auto print:block print:w-full print:h-auto">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-300 print:shadow-none print:rounded-none print:max-h-none print:overflow-visible print:w-full">
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 print:hidden">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Day End Audit Report</h3>
+                <p className="text-sm text-slate-500 font-medium mt-1">Detailed summary of all transactions and operator actions.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => window.print()} disabled={loadingReport || !reportData} className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white rounded-lg font-semibold hover:bg-slate-900 disabled:opacity-50">
+                  <Printer className="w-4 h-4" /> Print
+                </button>
+                <button onClick={() => setShowReportModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-8 print:p-0">
+              {loadingReport ? (
+                <div className="flex justify-center items-center py-20 text-slate-400">Loading audit trail...</div>
+              ) : reportData ? (
+                <div className="space-y-4 text-black" id="printable-report">
+                  <div className="text-center border-b border-gray-300 pb-2">
+                    <h1 className="text-xl font-extrabold uppercase tracking-widest">Cashon Galle Credit - Daily Audit</h1>
+                    <p className="text-xs font-semibold mt-1">Date: {new Date(reportData.dayStatus.date).toLocaleDateString()} | Closed By: {reportData.dayStatus.closed_by_name || 'System'}</p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 my-2">
+                    <div className="border border-gray-200 p-2 bg-white text-center">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Inflow</p>
+                      <p className="text-sm font-bold text-black">Rs. {Number(reportData.dayStatus.total_in).toLocaleString()}</p>
+                    </div>
+                    <div className="border border-gray-200 p-2 bg-white text-center">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Total Outflow</p>
+                      <p className="text-sm font-bold text-black">Rs. {Number(reportData.dayStatus.total_out).toLocaleString()}</p>
+                    </div>
+                    <div className="border border-gray-200 p-2 bg-white text-center">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Net Balance</p>
+                      <p className="text-sm font-bold text-black">Rs. {Number(reportData.dayStatus.closing_balance).toLocaleString()}</p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold border-b border-gray-300 pb-1 mb-2 uppercase tracking-wide">Journal Entries & Actions</h3>
+                    {reportData.journals && reportData.journals.length > 0 ? (
+                      <div className="space-y-1">
+                        {reportData.journals.map((j, i) => (
+                          <div key={i} className="border-b border-gray-300 p-1">
+                            <div className="flex justify-between items-start mb-1 pb-1 border-0">
+                              <div>
+                                <p className="font-bold text-xs">[{j.reference_source || 'MANUAL'}] Ref: {j.reference_id}</p>
+                                <p className="text-[10px] text-gray-600 mt-0.5">{j.description}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-[10px] text-gray-800">Op: {j.created_by_name || 'System'}</p>
+                                <p className="text-gray-500 mt-0 text-[9px]">{new Date(j.transaction_date).toLocaleTimeString()}</p>
+                              </div>
+                            </div>
+                            <table className="w-full text-[10px]">
+                              <thead>
+                                <tr className="text-left text-gray-500 border-b border-gray-200">
+                                  <th className="pb-1 font-bold w-1/2">Account</th>
+                                  <th className="pb-1 font-bold text-right">Debit (Rs)</th>
+                                  <th className="pb-1 font-bold text-right">Credit (Rs)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {j.lines && j.lines.map((l, idx) => (
+                                  <tr key={idx} className="border-b border-gray-50 last:border-0">
+                                    <td className="py-0.5 text-gray-800">{l.account_code} - {l.account_name}</td>
+                                    <td className="py-0.5 text-right font-medium text-gray-800">{Number(l.debit) > 0 ? Number(l.debit).toLocaleString() : '-'}</td>
+                                    <td className="py-0.5 text-right font-medium text-gray-800">{Number(l.credit) > 0 ? Number(l.credit).toLocaleString() : '-'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 italic">No journal entries recorded for this day.</p>
+                    )}
+                  </div>
+                  
+                  <div className="pt-2 text-center text-[10px] text-gray-400 border-t border-gray-200">
+                    End of Report
+                  </div>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       )}

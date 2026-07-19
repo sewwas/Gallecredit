@@ -20,6 +20,11 @@ const userRoutes = require('./routes/users');
 const cronRoutes = require('./routes/cron');
 const { pool } = require('./db');
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('FATAL ERROR: JWT_SECRET is not defined in production.');
+  process.exit(1);
+}
+
 const app = express();
 
 app.use(cors());

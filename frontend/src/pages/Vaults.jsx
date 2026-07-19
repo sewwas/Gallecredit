@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, Landmark, ArrowRightLeft, Check, X, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react';
+import { Wallet, Landmark, ArrowRightLeft, Check, X, ShieldAlert, Sparkles, RefreshCw, Plus } from 'lucide-react';
 
 const Vaults = () => {
   const { user } = useAuth();
@@ -16,6 +16,11 @@ const Vaults = () => {
   const [actioning, setActioning] = useState(null); // stores id being actioned
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  const [showCapitalInModal, setShowCapitalInModal] = useState(false);
+  const [showCapitalOutModal, setShowCapitalOutModal] = useState(false);
+  const [capitalForm, setCapitalForm] = useState({ date: new Date().toISOString().split('T')[0], sourceOrDest: '', amount: '', description: '' });
+  const [capitalSubmitting, setCapitalSubmitting] = useState(false);
 
   // Access check
   const isAdminOrAccountant = user?.role === 'admin' || user?.role === 'accountant';
@@ -108,6 +113,46 @@ const Vaults = () => {
     }
   };
 
+  const handleCapitalInSubmit = async (e) => {
+    e.preventDefault();
+    if (capitalSubmitting) return;
+    setCapitalSubmitting(true);
+    try {
+      const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/capital/inflow`, { 
+        date: capitalForm.date, source: capitalForm.sourceOrDest, amount: capitalForm.amount, description: capitalForm.description 
+      }, config);
+      setSuccessMsg('Capital Inflow saved successfully!');
+      setShowCapitalInModal(false);
+      setCapitalForm({ date: new Date().toISOString().split('T')[0], sourceOrDest: '', amount: '', description: '' });
+      fetchVaultsData();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.error || err.response?.data?.message || err.message);
+    } finally {
+      setCapitalSubmitting(false);
+    }
+  };
+
+  const handleCapitalOutSubmit = async (e) => {
+    e.preventDefault();
+    if (capitalSubmitting) return;
+    setCapitalSubmitting(true);
+    try {
+      const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/accounting/capital/distribution`, { 
+        date: capitalForm.date, destination: capitalForm.sourceOrDest, amount: capitalForm.amount, description: capitalForm.description 
+      }, config);
+      setSuccessMsg('Profit Distribution saved successfully!');
+      setShowCapitalOutModal(false);
+      setCapitalForm({ date: new Date().toISOString().split('T')[0], sourceOrDest: '', amount: '', description: '' });
+      fetchVaultsData();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.error || err.response?.data?.message || err.message);
+    } finally {
+      setCapitalSubmitting(false);
+    }
+  };
+
   // Calculations for Admin / Accountant Dashboard
   const centralVault = vaults.find(v => v.type === 'MAIN');
   const staffVaults = vaults.filter(v => v.type === 'STAFF');
@@ -165,6 +210,14 @@ const Vaults = () => {
             </div>
             <h3 className="text-3xl font-extrabold tracking-tight">Rs. {totalCentral.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
             <p className="text-xs text-slate-500 font-semibold mt-2">Locked Branch Capital Pool</p>
+            <div className="flex gap-2 mt-4 relative z-10">
+              <button onClick={() => setShowCapitalInModal(true)} className="flex-1 flex justify-center items-center gap-1.5 py-1.5 bg-white/10 hover:bg-emerald-500/80 text-white rounded-lg text-xs font-bold transition-all border border-white/10 hover:border-emerald-500">
+                <Plus className="w-3.5 h-3.5" /> Inflow
+              </button>
+              <button onClick={() => setShowCapitalOutModal(true)} className="flex-1 flex justify-center items-center gap-1.5 py-1.5 bg-white/10 hover:bg-purple-500/80 text-white rounded-lg text-xs font-bold transition-all border border-white/10 hover:border-purple-500">
+                <ArrowRightLeft className="w-3.5 h-3.5" /> Distribute
+              </button>
+            </div>
           </div>
 
           {/* Combined Staff Drawers */}
@@ -337,6 +390,88 @@ const Vaults = () => {
         </div>
 
       </div>
+
+      {/* Capital In Modal */}
+      {showCapitalInModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Capital Inflow</h3>
+                <p className="text-sm text-slate-500 font-medium mt-1">Record capital injected from investors.</p>
+              </div>
+              <button onClick={() => setShowCapitalInModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCapitalInSubmit} className="p-8 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
+                <input required disabled={capitalSubmitting} type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 rounded-xl font-semibold outline-none transition-all" value={capitalForm.date} onChange={e => setCapitalForm({...capitalForm, date: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Investor Name (Source)</label>
+                <input required disabled={capitalSubmitting} type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 rounded-xl font-semibold outline-none transition-all" placeholder="e.g. John Doe" value={capitalForm.sourceOrDest} onChange={e => setCapitalForm({...capitalForm, sourceOrDest: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Amount (Rs.)</label>
+                <input required disabled={capitalSubmitting} type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 rounded-xl font-semibold outline-none transition-all" placeholder="0.00" value={capitalForm.amount} onChange={e => setCapitalForm({...capitalForm, amount: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+                <textarea disabled={capitalSubmitting} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 rounded-xl font-semibold outline-none transition-all resize-none" rows="3" placeholder="Add more details..." value={capitalForm.description} onChange={e => setCapitalForm({...capitalForm, description: e.target.value})}></textarea>
+              </div>
+              <div className="pt-2 flex gap-4">
+                <button type="button" onClick={() => setShowCapitalInModal(false)} className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors" disabled={capitalSubmitting}>Cancel</button>
+                <button type="submit" className="flex-1 py-3 px-4 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-colors" disabled={capitalSubmitting}>
+                  {capitalSubmitting ? 'Saving...' : 'Save Inflow'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Capital Out Modal */}
+      {showCapitalOutModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Profit Distribution</h3>
+                <p className="text-sm text-slate-500 font-medium mt-1">Record profit payouts to investors.</p>
+              </div>
+              <button onClick={() => setShowCapitalOutModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleCapitalOutSubmit} className="p-8 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
+                <input required disabled={capitalSubmitting} type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 rounded-xl font-semibold outline-none transition-all" value={capitalForm.date} onChange={e => setCapitalForm({...capitalForm, date: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Investor Name (Destination)</label>
+                <input required disabled={capitalSubmitting} type="text" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 rounded-xl font-semibold outline-none transition-all" placeholder="e.g. John Doe" value={capitalForm.sourceOrDest} onChange={e => setCapitalForm({...capitalForm, sourceOrDest: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Amount (Rs.)</label>
+                <input required disabled={capitalSubmitting} type="number" step="0.01" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 rounded-xl font-semibold outline-none transition-all" placeholder="0.00" value={capitalForm.amount} onChange={e => setCapitalForm({...capitalForm, amount: e.target.value})} />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+                <textarea disabled={capitalSubmitting} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10 rounded-xl font-semibold outline-none transition-all resize-none" rows="3" placeholder="Add more details..." value={capitalForm.description} onChange={e => setCapitalForm({...capitalForm, description: e.target.value})}></textarea>
+              </div>
+              <div className="pt-2 flex gap-4">
+                <button type="button" onClick={() => setShowCapitalOutModal(false)} className="flex-1 py-3 px-4 bg-slate-100 text-slate-700 font-bold rounded-xl hover:bg-slate-200 transition-colors" disabled={capitalSubmitting}>Cancel</button>
+                <button type="submit" className="flex-1 py-3 px-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 transition-colors" disabled={capitalSubmitting}>
+                  {capitalSubmitting ? 'Saving...' : 'Save Payout'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

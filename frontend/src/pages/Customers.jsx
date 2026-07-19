@@ -27,7 +27,8 @@ const Customers = () => {
     address: '', 
     kyc_status: 'pending',
     location: 'Galle',
-    location_code: 'GL'
+    location_code: 'GL',
+    application_id: ''
   });
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -54,11 +55,11 @@ const Customers = () => {
     }
   };
 
-  const handleUpload = async (e) => {
+  const handleUpload = async (e, predefinedType = null) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const type = prompt('Enter document type (e.g. NIC Front, NIC Back, Utility Bill):', 'NIC Front');
+    const type = predefinedType || prompt('Enter document type (e.g. NIC Front, NIC Back, Utility Bill):', 'NIC Front');
     if (!type) return;
 
     const formDataObj = new FormData();
@@ -141,7 +142,8 @@ const Customers = () => {
       address: customer.address,
       kyc_status: customer.kyc_status || 'pending',
       location: customer.location || 'Galle',
-      location_code: customer.location_code || 'GL'
+      location_code: customer.location_code || 'GL',
+      application_id: customer.application_id || ''
     });
     setSelectedCustomerId(customer.customer_id);
     setEditMode(true);
@@ -159,7 +161,8 @@ const Customers = () => {
       address: '', 
       kyc_status: 'pending',
       location: 'Galle',
-      location_code: 'GL'
+      location_code: 'GL',
+      application_id: ''
     });
     setIsCustomLoc(false);
     setError('');
@@ -226,6 +229,7 @@ const Customers = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-200">
+                  <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">App ID</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Name</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">NIC</th>
                   <th className="py-5 px-6 text-xs font-bold text-slate-500 uppercase tracking-wider">Phone</th>
@@ -237,6 +241,7 @@ const Customers = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredCustomers.map((c) => (
                   <tr key={c.customer_id} className="hover:bg-slate-50/50 transition-colors duration-200">
+                    <td className="py-5 px-6 text-sm font-bold text-primary-700">{c.application_id || '-'}</td>
                     <td className="py-5 px-6 text-sm font-bold text-slate-800">{c.name}</td>
                     <td className="py-5 px-6 text-sm text-slate-600 font-medium">{c.nic}</td>
                     <td className="py-5 px-6 text-sm text-slate-600 font-medium">{c.phone}</td>
@@ -276,7 +281,7 @@ const Customers = () => {
                 ))}
                 {filteredCustomers.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="py-12 text-center text-slate-400 font-medium">No customers found matching your criteria.</td>
+                    <td colSpan="7" className="py-12 text-center text-slate-400 font-medium">No customers found matching your criteria.</td>
                   </tr>
                 )}
               </tbody>
@@ -300,9 +305,15 @@ const Customers = () => {
             </div>
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-5">
               {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-xl font-medium">{error}</div>}
-              <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Name</label>
-                <input required disabled={isSubmitting} type="text" className="premium-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Application ID (Optional)</label>
+                  <input disabled={isSubmitting} type="text" className="premium-input" placeholder="e.g. APP-001" value={formData.application_id} onChange={e => setFormData({...formData, application_id: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Name</label>
+                  <input required disabled={isSubmitting} type="text" className="premium-input" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">NIC</label>
@@ -401,12 +412,23 @@ const Customers = () => {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
-              <div className="flex justify-between items-center">
-                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Uploaded Files</h4>
-                <label className="cursor-pointer premium-btn py-2 px-4 text-xs font-bold">
-                  {uploading ? 'Uploading...' : 'Upload New'}
-                  <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
-                </label>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h4 className="text-sm font-bold text-slate-700 uppercase tracking-wider shrink-0">Uploaded Files</h4>
+                <div className="flex gap-2 flex-wrap justify-end">
+                  {['NIC Front', 'Copy B/R', 'Address Proof', 'Utility Bill'].map(type => {
+                    const isUploaded = docs.some(d => d.document_type === type);
+                    return (
+                      <label key={type} className={`cursor-pointer premium-btn py-1.5 px-3 text-[10px] font-bold shadow-sm border-0 ${isUploaded ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-800 text-white hover:bg-slate-700'}`}>
+                        {isUploaded ? <><CheckCircle className="w-3 h-3 inline mr-1" /> {type} Done</> : `+ ${type}`}
+                        <input type="file" className="hidden" onChange={(e) => handleUpload(e, type)} disabled={uploading} />
+                      </label>
+                    );
+                  })}
+                  <label className="cursor-pointer premium-btn py-1.5 px-3 text-[10px] font-bold shadow-sm">
+                    + Custom
+                    <input type="file" className="hidden" onChange={(e) => handleUpload(e, null)} disabled={uploading} />
+                  </label>
+                </div>
               </div>
               
               <div className="space-y-3 max-h-64 overflow-y-auto pr-2">

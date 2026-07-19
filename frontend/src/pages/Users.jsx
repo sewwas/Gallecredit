@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert, UserPlus, Edit2, Shield, UserCheck, RefreshCw, X, Check, Power } from 'lucide-react';
+import { ShieldAlert, UserPlus, Edit2, Shield, UserCheck, RefreshCw, X, Check, Power, Wallet } from 'lucide-react';
 
 const Users = () => {
   const { user } = useAuth();
@@ -27,6 +27,11 @@ const Users = () => {
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  
+  const [showPayModal, setShowPayModal] = useState(false);
+  const [payUser, setPayUser] = useState(null);
+  const [payForm, setPayForm] = useState({ date: new Date().toISOString().split('T')[0], category: 'Salary', amount: '', description: '' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Form states
   const [formData, setFormData] = useState({
@@ -63,6 +68,31 @@ const Users = () => {
       [e.target.name]: e.target.value
     });
   };
+
+  const handlePayEmployee = async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const expenseData = {
+        date: payForm.date,
+        category: payForm.category,
+        amount: payForm.amount,
+        description: `${payForm.category} for ${payUser.name}: ${payForm.description || ''}`
+      };
+      const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`, expenseData, config);
+      setSuccessMsg(`Successfully recorded ${payForm.category} payment for ${payUser.name}`);
+      setShowPayModal(false);
+      setPayForm({ date: new Date().toISOString().split('T')[0], category: 'Salary', amount: '', description: '' });
+      setPayUser(null);
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || err.response?.data?.error || 'Failed to process payment');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -256,6 +286,16 @@ const Users = () => {
 
                 <div className="flex gap-2">
                   <button
+                    onClick={() => {
+                      setPayUser(u);
+                      setShowPayModal(true);
+                    }}
+                    className="p-2 hover:bg-emerald-50 text-slate-650 hover:text-emerald-600 rounded-xl border border-slate-100 transition-colors"
+                    title="Pay Salary / Allowance"
+                  >
+                    <Wallet className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => handleEditUser(u)}
                     className="p-2 hover:bg-slate-100 text-slate-650 hover:text-primary-600 rounded-xl border border-slate-100 transition-colors"
                     title="Edit User Profile"
@@ -279,6 +319,58 @@ const Users = () => {
           );
         })}
       </div>
+
+      {/* Pay Employee Modal */}
+      {showPayModal && payUser && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="px-8 py-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Pay Employee</h3>
+                <p className="text-sm text-slate-500 font-medium mt-1">Record payment for {payUser.name}.</p>
+              </div>
+              <button onClick={() => setShowPayModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <form onSubmit={handlePayEmployee} className="p-8 space-y-5">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Date</label>
+                <input required type="date" className="premium-input" value={payForm.date} onChange={e => setPayForm({...payForm, date: e.target.value})} disabled={isSubmitting} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Payment Type</label>
+                <select required className="premium-input" value={payForm.category} onChange={e => setPayForm({...payForm, category: e.target.value})} disabled={isSubmitting}>
+                  <option value="Salary">Salary</option>
+                  <option value="Allowance">Allowance</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Amount</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-400 font-medium">Rs.</span>
+                  <input required type="number" step="0.01" className="premium-input pl-12" placeholder="0.00" value={payForm.amount} onChange={e => setPayForm({...payForm, amount: e.target.value})} disabled={isSubmitting} />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Memo / Description (Optional)</label>
+                <textarea className="premium-input resize-none" rows="2" placeholder="Add details..." value={payForm.description} onChange={e => setPayForm({...payForm, description: e.target.value})} disabled={isSubmitting}></textarea>
+              </div>
+              
+              <div className="pt-4 flex gap-4">
+                <button type="button" onClick={() => setShowPayModal(false)} className="flex-1 secondary-btn" disabled={isSubmitting}>Cancel</button>
+                <button type="submit" className="flex-1 premium-btn !bg-emerald-600 !shadow-emerald-500/30" disabled={isSubmitting}>
+                  {isSubmitting ? 'Processing...' : 'Record Payment'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add User Modal */}
       {showAddModal && (

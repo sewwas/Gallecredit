@@ -69,7 +69,7 @@ const Layout = () => {
 
       {/* Collapsible & Mobile Drawer Sidebar */}
       <div 
-        className={`fixed inset-y-0 left-0 lg:static bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col transition-all duration-300 z-30 shadow-2xl text-slate-300 ${
+        className={`fixed inset-y-0 left-0 lg:static bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col transition-all duration-300 z-30 shadow-2xl text-slate-300 print:hidden ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-72'} w-72`}
       >
@@ -180,7 +180,7 @@ const Layout = () => {
       {/* Main Content Workspace Area */}
       <div className="flex-1 flex flex-col relative overflow-hidden">
         {/* Top Header Navigation bar */}
-        <header className="h-20 bg-white/40 backdrop-blur-xl border-b border-white/40 flex items-center justify-between px-6 lg:px-8 z-10 sticky top-0">
+        <header className="h-20 bg-white/40 backdrop-blur-xl border-b border-white/40 flex items-center justify-between px-6 lg:px-8 z-10 sticky top-0 print:hidden">
            <div className="flex items-center gap-4">
              {/* Hamburger button on mobile / tablet */}
              <button 
@@ -205,7 +205,7 @@ const Layout = () => {
         </header>
 
         {/* Dynamic page content output */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 z-0 relative">
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 z-0 relative print:p-0 print:overflow-visible">
           <div className="max-w-7xl mx-auto animate-in slide-in-from-bottom-6 fade-in duration-700">
             <Outlet />
           </div>

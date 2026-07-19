@@ -41,7 +41,11 @@ const Loans = () => {
     guarantor_name: '',
     guarantor_nic: '',
     guarantor_phone: '',
-    guarantor_address: ''
+    guarantor_address: '',
+    guarantor2_name: '',
+    guarantor2_nic: '',
+    guarantor2_phone: '',
+    guarantor2_address: ''
   });
   const [previewSchedule, setPreviewSchedule] = useState([]);
 
@@ -135,7 +139,11 @@ const Loans = () => {
         guarantor_name: '',
         guarantor_nic: '',
         guarantor_phone: '',
-        guarantor_address: ''
+        guarantor_address: '',
+        guarantor2_name: '',
+        guarantor2_nic: '',
+        guarantor2_phone: '',
+        guarantor2_address: ''
       });
       fetchData();
     } catch (err) {
@@ -512,7 +520,7 @@ const Loans = () => {
                     onClick={() => setFormData({...formData, interest_method: 'reducing'})}
                     className={`py-3 px-4 rounded-xl text-sm font-semibold border transition-all ${formData.interest_method === 'reducing' ? 'bg-primary-50 border-primary-600 text-primary-700 shadow-sm font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                   >
-                    Reducing Balance
+                    Mortgage Calculator (Reducing)
                   </button>
                 </div>
               </div>
@@ -550,28 +558,54 @@ const Loans = () => {
               </div>
 
               <div className="pt-2 pb-1 border-b border-slate-100">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Guarantor Details (Optional)</h4>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Guarantor 1 Details (Optional)</h4>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Guarantor Name</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Name</label>
                   <input type="text" className="premium-input" value={formData.guarantor_name} onChange={e => setFormData({...formData, guarantor_name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Guarantor NIC</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIC</label>
                   <input type="text" className="premium-input" value={formData.guarantor_nic} onChange={e => setFormData({...formData, guarantor_nic: e.target.value})} />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Guarantor Phone</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Phone</label>
                   <input type="text" className="premium-input" value={formData.guarantor_phone} onChange={e => setFormData({...formData, guarantor_phone: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Guarantor Address</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Address</label>
                   <input type="text" className="premium-input" value={formData.guarantor_address} onChange={e => setFormData({...formData, guarantor_address: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="pt-2 pb-1 border-b border-slate-100">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Guarantor 2 Details (Optional)</h4>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Name</label>
+                  <input type="text" className="premium-input" value={formData.guarantor2_name} onChange={e => setFormData({...formData, guarantor2_name: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">NIC</label>
+                  <input type="text" className="premium-input" value={formData.guarantor2_nic} onChange={e => setFormData({...formData, guarantor2_nic: e.target.value})} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Phone</label>
+                  <input type="text" className="premium-input" value={formData.guarantor2_phone} onChange={e => setFormData({...formData, guarantor2_phone: e.target.value})} />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Address</label>
+                  <input type="text" className="premium-input" value={formData.guarantor2_address} onChange={e => setFormData({...formData, guarantor2_address: e.target.value})} />
                 </div>
               </div>
 

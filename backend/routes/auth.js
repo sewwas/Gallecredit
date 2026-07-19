@@ -24,9 +24,14 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
+    const secret = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? 'supersecretjwtkey_please_change_in_production' : null);
+    if (!secret) {
+      return res.status(500).json({ error: 'Server configuration error: missing JWT_SECRET' });
+    }
+
     const token = jwt.sign(
       { userId: user.user_id, user_id: user.user_id, role: user.role, username: user.username },
-      process.env.JWT_SECRET || 'supersecretjwtkey_please_change_in_production',
+      secret,
       { expiresIn: '8h' }
     );
 
@@ -75,7 +80,7 @@ router.post('/send-otp', async (req, res) => {
 
     res.json({
       message: 'A secure 6-digit recovery code has been sent to your email address.',
-      devOtp: emailResult.development ? otp : null // Provide OTP to frontend ONLY if in dev fallback mode
+      devOtp: (process.env.NODE_ENV !== 'production' && emailResult.development) ? otp : null
     });
   } catch (err) {
     console.error('Send OTP error:', err);
