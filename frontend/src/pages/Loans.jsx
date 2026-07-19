@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 import { Plus, Eye, ShieldAlert, CalendarClock, Check, X, Sparkles, Receipt, RefreshCw, Landmark } from 'lucide-react';
+import Select from 'react-select';
 
 const Loans = () => {
   const { user } = useAuth();
@@ -473,10 +474,38 @@ const Loans = () => {
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Customer</label>
-                <select required className="premium-input bg-white font-semibold" value={formData.customer_id} onChange={e => setFormData({...formData, customer_id: e.target.value})}>
-                  <option value="">Select Customer</option>
-                  {customers.map(c => <option key={c.customer_id} value={c.customer_id}>{c.name} - {c.nic} ({c.kyc_status.toUpperCase()})</option>)}
-                </select>
+                <Select
+                  options={customers.map(c => ({
+                    value: c.customer_id,
+                    label: `${c.name} - ${c.nic} (${c.kyc_status.toUpperCase()})`
+                  }))}
+                  value={
+                    formData.customer_id 
+                      ? customers
+                          .filter(c => c.customer_id === formData.customer_id)
+                          .map(c => ({
+                            value: c.customer_id,
+                            label: `${c.name} - ${c.nic} (${c.kyc_status.toUpperCase()})`
+                          }))[0]
+                      : null
+                  }
+                  onChange={selected => setFormData({...formData, customer_id: selected ? selected.value : ''})}
+                  placeholder="Search customer by name or NIC..."
+                  isSearchable
+                  menuPortalTarget={document.body}
+                  styles={{
+                    control: (base, state) => ({
+                      ...base,
+                      backgroundColor: state.isFocused ? '#ffffff' : '#f8fafc',
+                      minHeight: '46px',
+                      borderRadius: '0.75rem',
+                      borderColor: state.isFocused ? '#0ea5e9' : '#e2e8f0',
+                      boxShadow: state.isFocused ? '0 0 0 4px rgba(14, 165, 233, 0.1)' : 'none',
+                      '&:hover': { borderColor: state.isFocused ? '#0ea5e9' : '#cbd5e1' }
+                    }),
+                    menuPortal: base => ({ ...base, zIndex: 9999 })
+                  }}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
