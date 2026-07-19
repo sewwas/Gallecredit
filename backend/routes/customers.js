@@ -278,6 +278,11 @@ router.post('/:id/remind', async (req, res) => {
 // Create a customer
 router.post('/', async (req, res) => {
   const { name, nic, phone, address, kyc_status, location, location_code, application_id } = req.body;
+
+  if (!/^([0-9]{9}[vVxX]|[0-9]{12})$/.test(nic)) {
+    return res.status(400).json({ error: 'Invalid Sri Lankan NIC format' });
+  }
+
   try {
     const result = await pool.query(
       'INSERT INTO customers (name, nic, phone, address, kyc_status, location, location_code, application_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
@@ -296,6 +301,11 @@ router.post('/', async (req, res) => {
 // Update a customer
 router.put('/:id', async (req, res) => {
   const { name, nic, phone, address, kyc_status, location, location_code, application_id } = req.body;
+
+  if (!/^([0-9]{9}[vVxX]|[0-9]{12})$/.test(nic)) {
+    return res.status(400).json({ error: 'Invalid Sri Lankan NIC format' });
+  }
+
   try {
     const result = await pool.query(
       'UPDATE customers SET name = $1, nic = $2, phone = $3, address = $4, kyc_status = $5, location = $6, location_code = $7, application_id = $8 WHERE customer_id = $9 RETURNING *',

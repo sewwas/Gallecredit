@@ -115,6 +115,12 @@ const Customers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
+
+    if (!/^([0-9]{9}[vVxX]|[0-9]{12})$/.test(formData.nic)) {
+      setError('Invalid Sri Lankan NIC format. Must be 9 digits + V/X or 12 digits.');
+      return;
+    }
+
     setIsSubmitting(true);
     setError('');
     try {
