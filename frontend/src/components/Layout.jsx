@@ -178,36 +178,41 @@ const Layout = () => {
       </div>
 
       {/* Main Content Workspace Area */}
-      <div className="flex-1 flex flex-col relative overflow-hidden">
-        {/* Top Header Navigation bar */}
-        <header className="h-20 bg-white/40 backdrop-blur-xl border-b border-white/40 flex items-center justify-between px-6 lg:px-8 z-10 sticky top-0 print:hidden">
-           <div className="flex items-center gap-4">
-             {/* Hamburger button on mobile / tablet */}
-             <button 
-               onClick={() => setIsMobileOpen(true)}
-               className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-colors"
-               aria-label="Open Sidebar"
-             >
-               <Menu className="w-6 h-6" />
-             </button>
-             
-             <h1 className="text-lg lg:text-xl font-extrabold text-slate-900 capitalize tracking-tight truncate max-w-[200px] sm:max-w-none">
-               {location.pathname === '/' ? 'Dashboard' : (location.pathname.startsWith('/payments') ? 'Log Payments' : location.pathname.split('/')[1].replace('-', ' '))}
-             </h1>
-           </div>
-           
-           <div className="flex items-center gap-4">
-             {/* Alerts notifications bell */}
-             <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm text-slate-600 hover:text-primary-600 transition-colors cursor-pointer">
-               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H6" /></svg>
-             </div>
-           </div>
-        </header>
-
+      <div className="flex-1 flex flex-col relative overflow-hidden bg-slate-50/50">
+        
         {/* Dynamic page content output */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 z-0 relative print:p-0 print:overflow-visible">
-          <div className="max-w-7xl mx-auto animate-in slide-in-from-bottom-6 fade-in duration-700">
-            <Outlet />
+        <main className="flex-1 overflow-y-auto relative print:overflow-visible">
+          
+          {/* Top Header Navigation bar (Moved inside main to fix z-index with popups) */}
+          <header className="h-20 bg-white/60 backdrop-blur-xl border-b border-slate-200/60 flex items-center justify-between px-6 lg:px-8 z-40 sticky top-0 print:hidden">
+            <div className="flex items-center gap-4">
+              {/* Hamburger button on mobile / tablet */}
+              <button 
+                onClick={() => setIsMobileOpen(true)}
+                className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-slate-100 text-slate-700 hover:text-slate-900 transition-colors"
+                aria-label="Open Sidebar"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+              
+              <h1 className="text-lg lg:text-xl font-extrabold text-slate-900 capitalize tracking-tight truncate max-w-[200px] sm:max-w-none">
+                {location.pathname === '/' ? 'Dashboard' : (location.pathname.startsWith('/payments') ? 'Log Payments' : location.pathname.split('/')[1].replace('-', ' '))}
+              </h1>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Alerts notifications bell */}
+              <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm text-slate-600 hover:text-primary-600 transition-colors cursor-pointer">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H6" /></svg>
+              </div>
+            </div>
+          </header>
+
+          <div className="p-4 lg:p-8 print:p-0">
+            {/* Removed animate-in transform which was trapping fixed modals */}
+            <div className="max-w-7xl mx-auto">
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>
