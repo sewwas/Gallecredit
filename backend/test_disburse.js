@@ -54,33 +54,20 @@ async function testDisburse(loanId) {
       return nextDate;
     }
 
-    let total_amount = 0;
-    let installments = [];
+    const { calculateSchedule } = require('./utils/amortization');
+    const scheduleResult = calculateSchedule({
+      loan_amount: amount,
+      interest_rate: loan.interest_rate,
+      no_of_installments: n,
+      loan_type: loan.loan_type,
+      interest_method: loan.interest_method || 'flat',
+      issue_date: today,
+      holidaySet
+    });
 
-    if (loan.interest_method === 'reducing') {
-      let emi = rate === 0 ? amount / n : amount * rate * Math.pow(1 + rate, n) / (Math.pow(1 + rate, n) - 1);
-      total_amount = emi * n;
-      let remainingPrincipal = amount;
-      let currentDueDate = new Date(today);
-      for (let i = 1; i <= n; i++) {
-        const interestForPeriod = remainingPrincipal * rate;
-        const principalForPeriod = emi - interestForPeriod;
-        remainingPrincipal -= principalForPeriod;
-        currentDueDate = getNextWorkingDate(currentDueDate, loan.loan_type, holidaySet);
-        installments.push({ due_date: currentDueDate.toISOString().split('T')[0], amount: emi.toFixed(2) });
-      }
-    } else {
-      const totalInterest = amount * rate;
-      total_amount = amount + totalInterest;
-      const installmentAmount = total_amount / n;
-      let currentDueDate = new Date(today);
-      for (let i = 1; i <= n; i++) {
-        currentDueDate = getNextWorkingDate(currentDueDate, loan.loan_type, holidaySet);
-        installments.push({ due_date: currentDueDate.toISOString().split('T')[0], amount: installmentAmount.toFixed(2) });
-      }
-    }
-
-    const finalDueDate = installments[installments.length - 1].due_date;
+    const total_amount = scheduleResult.total_amount;
+    const installments = scheduleResult.installments;
+    const finalDueDate = scheduleResult.final_due_date;
     console.log('Final due date:', finalDueDate);
     console.log('Generated installments length:', installments.length);
 

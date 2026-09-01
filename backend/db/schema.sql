@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS loans (
     customer_id INTEGER NOT NULL REFERENCES customers(customer_id) ON DELETE CASCADE,
     loan_amount DECIMAL(12,2) NOT NULL,
     interest_rate DECIMAL(5,2) NOT NULL,
-    loan_type VARCHAR(20) CHECK (loan_type IN ('daily', 'weekly', 'monthly')),
+    loan_type VARCHAR(20) CHECK (loan_type IN ('daily', 'weekly', 'monthly', 'yearly')),
     interest_method VARCHAR(20) DEFAULT 'flat' CHECK (interest_method IN ('flat', 'reducing')),
     issue_date DATE,
     due_date DATE,
@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS installments (
     loan_id INTEGER REFERENCES loans(loan_id) ON DELETE CASCADE,
     due_date DATE NOT NULL,
     amount DECIMAL(12,2) NOT NULL,
+    principal_amount DECIMAL(12,2) DEFAULT 0.00,
+    interest_amount DECIMAL(12,2) DEFAULT 0.00,
     paid_amount DECIMAL(12,2) DEFAULT 0.00,
     penalty_amount DECIMAL(12,2) DEFAULT 0.00,
     status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'partial', 'paid'))

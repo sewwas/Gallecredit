@@ -52,38 +52,167 @@ const Loans = () => {
 
   const calculatePreview = () => {
     const { loan_amount, interest_rate, no_of_installments, loan_type, interest_method, issue_date } = formData;
-    if (!loan_amount || interest_rate === '' || !no_of_installments) {
+    if (!loan_amount || interest_rate === '' || !no_of_installments || isNaN(parseFloat(loan_amount)) || isNaN(parseInt(no_of_installments))) {
       setPreviewSchedule([]);
       return;
     }
 
     const P = parseFloat(loan_amount);
-    const r = parseFloat(interest_rate) / 100;
+    const R = parseFloat(interest_rate);
     const n = parseInt(no_of_installments);
+    if (P <= 0 || n <= 0) {
+      setPreviewSchedule([]);
+      return;
+    }
+
     let installments = [];
-    let currentDueDate = new Date(issue_date);
+    let currentDueDate = new Date(issue_date || new Date());
 
     if (interest_method === 'reducing') {
-      let emi = 0;
-      if (r === 0) {
-        emi = P / n;
-      } else {
-        emi = P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+      let r = 0;
+      if (R > 0) {
+        if (loan_type === 'monthly') r = (R / 12) / 100;
+        else if (loan_type === 'weekly') r = (R / 52) / 100;
+        else if (loan_type === 'daily') r = (R / 365) / 100;
+        else r = R / 100;
       }
+      let emi = r === 0 ? P / n : P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1);
+      const regularEmi = Math.round(emi * 100) / 100;
+      let remainingPrincipal = P;
+
       for (let i = 1; i <= n; i++) {
         if (loan_type === 'daily') currentDueDate.setDate(currentDueDate.getDate() + 1);
-        if (loan_type === 'weekly') currentDueDate.setDate(currentDueDate.getDate() + 7);
-        if (loan_type === 'monthly') currentDueDate.setMonth(currentDueDate.getMonth() + 1);
-        installments.push({ due_date: new Date(currentDueDate).toISOString().split('T')[0], amount: emi.toFixed(2) });
+        else if (loan_type === 'weekly') currentDueDate.setDate(currentDueDate.getDate() + 7);
+        else if (loan_type === 'monthly') currentDueDate.setMonth(currentDueDate.getMonth() + 1);
+
+        let interestPortion = Math.round(remainingPrincipal * r * 100) / 100;
+        let principalPortion = 0;
+        let instAmt = 0;
+
+        if (i === n) {
+          principalPortion = Math.round(remainingPrincipal * 100) / 100;
+          instAmt = Math.round((principalPortion + interestPortion) * 100) / 100;
+          remainingPrincipal = 0;
+        } else {
+          principalPortion = Math.round((regularEmi - interestPortion) * 100) / 100;
+          instAmt = regularEmi;
+          remainingPrincipal = Math.round((remainingPrincipal - principalPortion) * 100) / 100;
+        }
+
+        installments.push({
+          due_date: new Date(currentDueDate).toISOString().split('T')[0],
+          amount: instAmt.toFixed(2),
+          principal_amount: principalPortion.toFixed(2),
+          interest_amount: interestPortion.toFixed(2)
+        });
+      }
+    } else if (interest_method === 'fixed_daily') {
+      const fixedFeePerPeriod = Math.round(R * 100) / 100;
+      const principalPerPeriod = Math.round((P / n) * 100) / 100;
+      const regularInst = Math.round((principalPerPeriod + fixedFeePerPeriod) * 100) / 100;
+      let remainingPrincipal = P;
+
+      for (let i = 1; i <= n; i++) {
+        if (loan_type === 'daily') currentDueDate.setDate(currentDueDate.getDate() + 1);
+        else if (loan_type === 'weekly') currentDueDate.setDate(currentDueDate.getDate() + 7);
+        else if (loan_type === 'monthly') currentDueDate.setMonth(currentDueDate.getMonth() + 1);
+        else if (loan_type === 'yearly') currentDueDate.setFullYear(currentDueDate.getFullYear() + 1);
+
+        let interestPortion = fixedFeePerPeriod;
+        let principalPortion = 0;
+        let instAmt = 0;
+
+        if (i === n) {
+          principalPortion = Math.round(remainingPrincipal * 100) / 100;
+          instAmt = Math.round((principalPortion + interestPortion) * 100) / 100;
+          remainingPrincipal = 0;
+        } else {
+          principalPortion = principalPerPeriod;
+          instAmt = regularInst;
+          remainingPrincipal = Math.round((remainingPrincipal - principalPortion) * 100) / 100;
+        }
+
+        installments.push({
+          due_date: new Date(currentDueDate).toISOString().split('T')[0],
+          amount: instAmt.toFixed(2),
+          principal_amount: principalPortion.toFixed(2),
+          interest_amount: interestPortion.toFixed(2)
+        });
+      }
+    } else if (interest_method === 'daily_flat') {
+      const r = R > 0 ? R / 100 : 0;
+      const interestPerPeriod = Math.round(P * r * 100) / 100;
+      const principalPerPeriod = Math.round((P / n) * 100) / 100;
+      const regularInst = Math.round((principalPerPeriod + interestPerPeriod) * 100) / 100;
+      let remainingPrincipal = P;
+
+      for (let i = 1; i <= n; i++) {
+        if (loan_type === 'daily') currentDueDate.setDate(currentDueDate.getDate() + 1);
+        else if (loan_type === 'weekly') currentDueDate.setDate(currentDueDate.getDate() + 7);
+        else if (loan_type === 'monthly') currentDueDate.setMonth(currentDueDate.getMonth() + 1);
+        else if (loan_type === 'yearly') currentDueDate.setFullYear(currentDueDate.getFullYear() + 1);
+
+        let interestPortion = interestPerPeriod;
+        let principalPortion = 0;
+        let instAmt = 0;
+
+        if (i === n) {
+          principalPortion = Math.round(remainingPrincipal * 100) / 100;
+          instAmt = Math.round((principalPortion + interestPortion) * 100) / 100;
+          remainingPrincipal = 0;
+        } else {
+          principalPortion = principalPerPeriod;
+          instAmt = regularInst;
+          remainingPrincipal = Math.round((remainingPrincipal - principalPortion) * 100) / 100;
+        }
+
+        installments.push({
+          due_date: new Date(currentDueDate).toISOString().split('T')[0],
+          amount: instAmt.toFixed(2),
+          principal_amount: principalPortion.toFixed(2),
+          interest_amount: interestPortion.toFixed(2)
+        });
       }
     } else {
-      const total = P + (P * r);
-      const instAmt = total / n;
+      let r = 0;
+      if (R > 0) {
+        if (loan_type === 'monthly') r = R / 100;
+        else if (loan_type === 'weekly') r = (R / 4) / 100;
+        else if (loan_type === 'daily') r = (R / 30) / 100;
+        else if (loan_type === 'yearly') r = (R * 12) / 100;
+        else r = R / 100;
+      }
+      const interestPerPeriod = Math.round(P * r * 100) / 100;
+      const principalPerPeriod = Math.round((P / n) * 100) / 100;
+      const regularInst = Math.round((principalPerPeriod + interestPerPeriod) * 100) / 100;
+      let remainingPrincipal = P;
+
       for (let i = 1; i <= n; i++) {
         if (loan_type === 'daily') currentDueDate.setDate(currentDueDate.getDate() + 1);
-        if (loan_type === 'weekly') currentDueDate.setDate(currentDueDate.getDate() + 7);
-        if (loan_type === 'monthly') currentDueDate.setMonth(currentDueDate.getMonth() + 1);
-        installments.push({ due_date: new Date(currentDueDate).toISOString().split('T')[0], amount: instAmt.toFixed(2) });
+        else if (loan_type === 'weekly') currentDueDate.setDate(currentDueDate.getDate() + 7);
+        else if (loan_type === 'monthly') currentDueDate.setMonth(currentDueDate.getMonth() + 1);
+        else if (loan_type === 'yearly') currentDueDate.setFullYear(currentDueDate.getFullYear() + 1);
+
+        let interestPortion = interestPerPeriod;
+        let principalPortion = 0;
+        let instAmt = 0;
+
+        if (i === n) {
+          principalPortion = Math.round(remainingPrincipal * 100) / 100;
+          instAmt = Math.round((principalPortion + interestPortion) * 100) / 100;
+          remainingPrincipal = 0;
+        } else {
+          principalPortion = principalPerPeriod;
+          instAmt = regularInst;
+          remainingPrincipal = Math.round((remainingPrincipal - principalPortion) * 100) / 100;
+        }
+
+        installments.push({
+          due_date: new Date(currentDueDate).toISOString().split('T')[0],
+          amount: instAmt.toFixed(2),
+          principal_amount: principalPortion.toFixed(2),
+          interest_amount: interestPortion.toFixed(2)
+        });
       }
     }
     setPreviewSchedule(installments);
@@ -514,18 +643,35 @@ const Loans = () => {
                   <input required type="number" step="0.01" className="premium-input" placeholder="0.00" value={formData.loan_amount} onChange={e => setFormData({...formData, loan_amount: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Interest Rate (%)</label>
-                  <input required type="number" step="0.01" className="premium-input" placeholder="0.00" value={formData.interest_rate} onChange={e => setFormData({...formData, interest_rate: e.target.value})} />
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">
+                    {formData.interest_method === 'fixed_daily' 
+                      ? 'Daily Fixed Fee (Rs. / day)' 
+                      : formData.interest_method === 'daily_flat' 
+                      ? 'Daily Flat Rate (% / day)' 
+                      : formData.interest_method === 'reducing' 
+                      ? 'Interest Rate (Reducing %)' 
+                      : 'Monthly Flat Rate (%)'}
+                  </label>
+                  <input 
+                    required 
+                    type="number" 
+                    step="0.01" 
+                    className="premium-input" 
+                    placeholder={formData.interest_method === 'fixed_daily' ? 'e.g. 500.00' : 'e.g. 10.00'} 
+                    value={formData.interest_rate} 
+                    onChange={e => setFormData({...formData, interest_rate: e.target.value})} 
+                  />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-2">Loan Type</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Loan Type / Frequency</label>
                   <select required className="premium-input bg-white font-semibold" value={formData.loan_type} onChange={e => setFormData({...formData, loan_type: e.target.value})}>
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
                     <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly / Annual</option>
                   </select>
                 </div>
                 <div>
@@ -535,38 +681,102 @@ const Loans = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Interest Method</label>
-                <div className="grid grid-cols-2 gap-4">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Interest Method & Scheme</label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <button 
                     type="button" 
                     onClick={() => setFormData({...formData, interest_method: 'flat'})}
-                    className={`py-3 px-4 rounded-xl text-sm font-semibold border transition-all ${formData.interest_method === 'flat' ? 'bg-primary-50 border-primary-600 text-primary-700 shadow-sm font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                    className={`py-3 px-3 rounded-xl text-xs font-semibold border transition-all text-left flex flex-col justify-between ${formData.interest_method === 'flat' ? 'bg-primary-50 border-primary-600 text-primary-800 shadow-sm ring-2 ring-primary-500/20 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                   >
-                    Flat Rate
+                    <span className="font-bold text-sm">Monthly Flat %</span>
+                    <span className="text-[10px] text-slate-500 font-normal mt-0.5">මාසික Flat (10%/mo)</span>
                   </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setFormData({...formData, interest_method: 'daily_flat', loan_type: 'daily'})}
+                    className={`py-3 px-3 rounded-xl text-xs font-semibold border transition-all text-left flex flex-col justify-between ${formData.interest_method === 'daily_flat' ? 'bg-primary-50 border-primary-600 text-primary-800 shadow-sm ring-2 ring-primary-500/20 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                  >
+                    <span className="font-bold text-sm">Daily Flat %</span>
+                    <span className="text-[10px] text-slate-500 font-normal mt-0.5">දෛනික Flat (10%/day)</span>
+                  </button>
+
+                  <button 
+                    type="button" 
+                    onClick={() => setFormData({...formData, interest_method: 'fixed_daily', loan_type: 'daily'})}
+                    className={`py-3 px-3 rounded-xl text-xs font-semibold border transition-all text-left flex flex-col justify-between ${formData.interest_method === 'fixed_daily' ? 'bg-primary-50 border-primary-600 text-primary-800 shadow-sm ring-2 ring-primary-500/20 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                  >
+                    <span className="font-bold text-sm">Fixed Daily Fee</span>
+                    <span className="text-[10px] text-slate-500 font-normal mt-0.5">නියත ගාස්තුව (Rs. 500/day)</span>
+                  </button>
+
                   <button 
                     type="button" 
                     onClick={() => setFormData({...formData, interest_method: 'reducing'})}
-                    className={`py-3 px-4 rounded-xl text-sm font-semibold border transition-all ${formData.interest_method === 'reducing' ? 'bg-primary-50 border-primary-600 text-primary-700 shadow-sm font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
+                    className={`py-3 px-3 rounded-xl text-xs font-semibold border transition-all text-left flex flex-col justify-between ${formData.interest_method === 'reducing' ? 'bg-primary-50 border-primary-600 text-primary-800 shadow-sm ring-2 ring-primary-500/20 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}
                   >
-                    Mortgage Calculator (Reducing)
+                    <span className="font-bold text-sm">Reducing (EMI)</span>
+                    <span className="text-[10px] text-slate-500 font-normal mt-0.5">ශේෂය අඩුවන EMI</span>
                   </button>
                 </div>
               </div>
               
               {previewSchedule.length > 0 && (
-                <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100">
-                  <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Schedule Draft Preview (Sundays excluded)</h4>
-                    <p className="text-sm font-bold text-primary-700">Total: Rs. {previewSchedule.reduce((sum, i) => sum + parseFloat(i.amount), 0).toLocaleString('en-US', { maximumFractionDigits: 2 })}</p>
+                <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-primary-50/30 border border-primary-100 shadow-sm space-y-4">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-2xs">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Repayable</p>
+                      <p className="text-sm font-extrabold text-slate-900 mt-0.5">
+                        Rs. {previewSchedule.reduce((sum, i) => sum + parseFloat(i.amount), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-2xs">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Interest</p>
+                      <p className="text-sm font-extrabold text-primary-600 mt-0.5">
+                        Rs. {previewSchedule.reduce((sum, i) => sum + parseFloat(i.interest_amount || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-2xs">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Regular EMI / Inst.</p>
+                      <p className="text-sm font-extrabold text-emerald-600 mt-0.5">
+                        Rs. {parseFloat(previewSchedule[0]?.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
                   </div>
-                  <div className="max-h-40 overflow-y-auto space-y-2 pr-2">
-                    {previewSchedule.map((inst, idx) => (
-                      <div key={idx} className="flex justify-between text-sm py-2 border-b border-slate-200/50 last:border-0">
-                        <span className="text-slate-600 font-medium">{idx + 1}. {new Date(inst.due_date).toLocaleDateString()}</span>
-                        <span className="font-bold text-slate-800">Rs. {parseFloat(inst.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                      </div>
-                    ))}
+
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-primary-500" />
+                        Amortization Schedule Preview ({formData.interest_method === 'fixed_daily' ? 'Fixed Daily Fee' : formData.interest_method === 'daily_flat' ? 'Daily Flat %' : formData.interest_method === 'reducing' ? 'Reducing Balance EMI' : 'Monthly Flat Rate'})
+                      </h4>
+                      <span className="text-xs font-semibold text-slate-500">{previewSchedule.length} Installments ({formData.loan_type})</span>
+                    </div>
+
+                    <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200/80 bg-white">
+                      <table className="w-full text-left text-xs">
+                        <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs text-slate-600 font-bold border-b border-slate-200">
+                          <tr>
+                            <th className="py-2 px-3">#</th>
+                            <th className="py-2 px-3">Due Date</th>
+                            <th className="py-2 px-3 text-right">Principal</th>
+                            <th className="py-2 px-3 text-right">Interest</th>
+                            <th className="py-2 px-3 text-right">Total Inst.</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
+                          {previewSchedule.map((inst, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2 px-3 text-slate-400 font-bold">{idx + 1}</td>
+                              <td className="py-2 px-3">{new Date(inst.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+                              <td className="py-2 px-3 text-right text-slate-600 font-semibold">Rs. {parseFloat(inst.principal_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                              <td className="py-2 px-3 text-right text-primary-600 font-semibold">Rs. {parseFloat(inst.interest_amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                              <td className="py-2 px-3 text-right font-bold text-slate-900">Rs. {parseFloat(inst.amount).toLocaleString('en-US', { minimumFractionDigits: 2 })}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               )}

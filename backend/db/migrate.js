@@ -23,6 +23,20 @@ async function migrate() {
     `);
     console.log('Created customer_documents table.');
 
+    // Add principal_amount and interest_amount to installments table
+    await pool.query(`
+      ALTER TABLE installments ADD COLUMN IF NOT EXISTS principal_amount DECIMAL(12,2) DEFAULT 0.00;
+      ALTER TABLE installments ADD COLUMN IF NOT EXISTS interest_amount DECIMAL(12,2) DEFAULT 0.00;
+    `);
+    console.log('Added principal_amount and interest_amount to installments table.');
+
+    // Update loan_type check constraint to include yearly
+    await pool.query(`
+      ALTER TABLE loans DROP CONSTRAINT IF EXISTS loans_loan_type_check;
+      ALTER TABLE loans ADD CONSTRAINT loans_loan_type_check CHECK (loan_type IN ('daily', 'weekly', 'monthly', 'yearly'));
+    `);
+    console.log('Updated loan_type check constraint.');
+
     console.log('Migration completed successfully.');
   } catch (err) {
     console.error('Migration failed:', err);

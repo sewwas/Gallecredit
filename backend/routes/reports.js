@@ -147,11 +147,11 @@ router.get('/collection-trends', auditReportView('collection_trends'), async (re
 // Loan Type Distribution
 router.get('/loan-distribution', auditReportView('loan_distribution'), async (req, res) => {
   const { startDate, endDate } = req.query;
-  let query = \`SELECT loan_type as name, COUNT(*) as value FROM loans GROUP BY loan_type\`;
+  let query = `SELECT loan_type as name, COUNT(*) as value FROM loans GROUP BY loan_type`;
   const params = [];
 
   if (startDate && endDate) {
-    query = \`SELECT loan_type as name, COUNT(*) as value FROM loans WHERE DATE(issue_date) >= $1 AND DATE(issue_date) <= $2 GROUP BY loan_type\`;
+    query = `SELECT loan_type as name, COUNT(*) as value FROM loans WHERE DATE(issue_date) >= $1 AND DATE(issue_date) <= $2 GROUP BY loan_type`;
     params.push(startDate, endDate);
   }
 

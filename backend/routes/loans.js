@@ -3,6 +3,7 @@ const router = express.Router();
 const { pool } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 const { dayCloseGuard } = require('../middleware/dayCloseGuard');
+const { calculateSchedule } = require('../utils/amortization');
 
 router.use(authenticateToken);
 
@@ -31,6 +32,10 @@ function getNextWorkingDate(startDate, loanType, holidaySet) {
   } else if (loanType === 'monthly') {
     do {
       nextDate.setMonth(nextDate.getMonth() + 1);
+    } while (!isWorkingDay(nextDate, holidaySet));
+  } else if (loanType === 'yearly') {
+    do {
+      nextDate.setFullYear(nextDate.getFullYear() + 1);
     } while (!isWorkingDay(nextDate, holidaySet));
   }
   return nextDate;
@@ -88,8 +93,14 @@ router.post('/', async (req, res) => {
     penalty_rate
   } = req.body;
   
-  if (!customer_id || !loan_amount || !interest_rate || !loan_type || !issue_date || !no_of_installments) {
+  if (!customer_id || !loan_amount || interest_rate === undefined || interest_rate === null || interest_rate === '' || !loan_type || !issue_date || !no_of_installments) {
     return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  const validMethods = ['flat', 'reducing', 'fixed_daily', 'daily_flat'];
+  const method = interest_method || 'flat';
+  if (!validMethods.includes(method)) {
+    return res.status(400).json({ error: `Invalid interest method. Must be one of: ${validMethods.join(', ')}` });
   }
 
   const client = await pool.connect();
@@ -109,51 +120,21 @@ router.post('/', async (req, res) => {
     }
 
     const amount = parseFloat(loan_amount);
-    const rate = parseFloat(interest_rate) / 100;
     const n = parseInt(no_of_installments);
-    let total_amount = 0;
-    let installmentsDraft = [];
-
     const holidaySet = await getHolidayDates(client);
 
-    // Calculate draft schedule details
-    if (interest_method === 'reducing') {
-      let emi = 0;
-      if (rate === 0) {
-        emi = amount / n;
-      } else {
-        emi = amount * rate * Math.pow(1 + rate, n) / (Math.pow(1 + rate, n) - 1);
-      }
-      total_amount = emi * n;
-      
-      let remainingPrincipal = amount;
-      let currentDueDate = new Date(issue_date);
+    const scheduleResult = calculateSchedule({
+      loan_amount: amount,
+      interest_rate,
+      no_of_installments: n,
+      loan_type,
+      interest_method: interest_method || 'flat',
+      issue_date,
+      holidaySet
+    });
 
-      for (let i = 1; i <= n; i++) {
-        const interestForPeriod = remainingPrincipal * rate;
-        const principalForPeriod = emi - interestForPeriod;
-        remainingPrincipal -= principalForPeriod;
-        currentDueDate = getNextWorkingDate(currentDueDate, loan_type, holidaySet);
-
-        installmentsDraft.push({
-          due_date: currentDueDate.toISOString().split('T')[0],
-          amount: emi.toFixed(2)
-        });
-      }
-    } else {
-      const totalInterest = amount * rate;
-      total_amount = amount + totalInterest;
-      const installmentAmount = total_amount / n;
-      
-      let currentDueDate = new Date(issue_date);
-      for (let i = 1; i <= n; i++) {
-        currentDueDate = getNextWorkingDate(currentDueDate, loan_type, holidaySet);
-        installmentsDraft.push({
-          due_date: currentDueDate.toISOString().split('T')[0],
-          amount: installmentAmount.toFixed(2)
-        });
-      }
-    }
+    const total_amount = scheduleResult.total_amount;
+    const installmentsDraft = scheduleResult.installments;
 
     // Count loans for this customer to establish sequence
     const countQuery = await client.query('SELECT COUNT(*) FROM loans WHERE customer_id = $1', [customer_id]);
@@ -162,6 +143,7 @@ router.post('/', async (req, res) => {
     let typePrefix = 'D';
     if (loan_type === 'weekly') typePrefix = 'W';
     else if (loan_type === 'monthly') typePrefix = 'M';
+    else if (loan_type === 'yearly') typePrefix = 'Y';
     const customerIdPadded = String(customer_id).padStart(3, '0');
     const loanCode = `${typePrefix}-${locationCode.toUpperCase()}-${customerIdPadded}-${loanCount + 1}`;
 
@@ -391,54 +373,26 @@ router.post('/:id/disburse', dayCloseGuard, async (req, res) => {
 
     // Calculate real installments calendar
     const holidaySet = await getHolidayDates(client);
-    let total_amount = 0;
-    let installments = [];
 
-    if (loan.interest_method === 'reducing') {
-      let emi = 0;
-      if (rate === 0) {
-        emi = amount / n;
-      } else {
-        emi = amount * rate * Math.pow(1 + rate, n) / (Math.pow(1 + rate, n) - 1);
-      }
-      total_amount = emi * n;
-      
-      let remainingPrincipal = amount;
-      let currentDueDate = new Date(today);
+    const scheduleResult = calculateSchedule({
+      loan_amount: amount,
+      interest_rate: loan.interest_rate,
+      no_of_installments: n,
+      loan_type: loan.loan_type,
+      interest_method: loan.interest_method || 'flat',
+      issue_date: today,
+      holidaySet
+    });
 
-      for (let i = 1; i <= n; i++) {
-        const interestForPeriod = remainingPrincipal * rate;
-        const principalForPeriod = emi - interestForPeriod;
-        remainingPrincipal -= principalForPeriod;
-        currentDueDate = getNextWorkingDate(currentDueDate, loan.loan_type, holidaySet);
-
-        installments.push({
-          due_date: currentDueDate.toISOString().split('T')[0],
-          amount: emi.toFixed(2)
-        });
-      }
-    } else {
-      const totalInterest = amount * rate;
-      total_amount = amount + totalInterest;
-      const installmentAmount = total_amount / n;
-      
-      let currentDueDate = new Date(today);
-      for (let i = 1; i <= n; i++) {
-        currentDueDate = getNextWorkingDate(currentDueDate, loan.loan_type, holidaySet);
-        installments.push({
-          due_date: currentDueDate.toISOString().split('T')[0],
-          amount: installmentAmount.toFixed(2)
-        });
-      }
-    }
-
-    const finalDueDate = installments[installments.length - 1].due_date;
+    const total_amount = scheduleResult.total_amount;
+    const installments = scheduleResult.installments;
+    const finalDueDate = scheduleResult.final_due_date;
 
     // Generate real installments
     for (let inst of installments) {
       await client.query(
-        `INSERT INTO installments (loan_id, due_date, amount) VALUES ($1, $2, $3)`,
-        [loanId, inst.due_date, inst.amount]
+        `INSERT INTO installments (loan_id, due_date, amount, principal_amount, interest_amount) VALUES ($1, $2, $3, $4, $5)`,
+        [loanId, inst.due_date, inst.amount, inst.principal_amount, inst.interest_amount]
       );
     }
 

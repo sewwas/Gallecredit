@@ -3,8 +3,8 @@ node_modules/
 **/node_modules/
 
 # Environment Variables
-.env
-**/.env
+.env*
+**/.env*
 
 # Production Builds
 dist/
@@ -18,5 +18,5 @@ uploads/
 .DS_Store
 Thumbs.db
 *.log
-
 .vercel
+scratch/
