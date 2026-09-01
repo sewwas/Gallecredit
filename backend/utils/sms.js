@@ -4,9 +4,14 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const fromNumber = process.env.TWILIO_PHONE_NUMBER;
 
-let client;
-if (accountSid && authToken) {
-  client = twilio(accountSid, authToken);
+let client = null;
+if (accountSid && authToken && accountSid.startsWith('AC')) {
+  try {
+    client = twilio(accountSid, authToken);
+  } catch (err) {
+    console.warn('[SMS] Failed to initialize Twilio client:', err.message);
+    client = null;
+  }
 }
 
 const formatPhoneNumber = (phone) => {
