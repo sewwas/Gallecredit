@@ -136,8 +136,8 @@ const Accounting = () => {
     setIsSubmitting(true);
     try {
       const payload = { ...expenseForm };
-      if ((payload.category === 'Salary' || payload.category === 'Allowance') && payload.staff_name) {
-        payload.description = `${payload.category} paid to ${payload.staff_name}: ${payload.description || ''}`;
+      if (['Salary', 'Allowance', 'Fuel'].includes(payload.category) && payload.staff_name) {
+        payload.description = `${payload.category} for ${payload.staff_name}: ${payload.description || ''}`;
       }
       const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
       await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/expenses`, payload, config);
@@ -531,7 +531,7 @@ const Accounting = () => {
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">Category</label>
-                <select required disabled={isSubmitting} className="premium-input" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})}>
+                <select required disabled={isSubmitting} className="premium-input" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value, staff_name: ['Salary', 'Allowance', 'Fuel'].includes(e.target.value) ? expenseForm.staff_name : ''})}>
                   <option value="" disabled>Select Expense Category</option>
                   <option value="Salary">Salary</option>
                   <option value="Allowance">Allowance</option>
@@ -543,7 +543,7 @@ const Accounting = () => {
                   <option value="Other">Other Operational Expense</option>
                 </select>
               </div>
-              {(expenseForm.category === 'Salary' || expenseForm.category === 'Allowance') && (
+              {(expenseForm.category === 'Salary' || expenseForm.category === 'Allowance' || expenseForm.category === 'Fuel') && (
                 <div className="animate-in slide-in-from-top-2 fade-in duration-300">
                   <label className="block text-sm font-semibold text-slate-700 mb-2">Select Employee / Staff</label>
                   <select required disabled={isSubmitting} className="premium-input" value={expenseForm.staff_name} onChange={e => setExpenseForm({...expenseForm, staff_name: e.target.value})}>

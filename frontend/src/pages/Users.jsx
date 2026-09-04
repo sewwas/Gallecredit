@@ -345,6 +345,7 @@ const Users = () => {
                 <select required className="premium-input" value={payForm.category} onChange={e => setPayForm({...payForm, category: e.target.value})} disabled={isSubmitting}>
                   <option value="Salary">Salary</option>
                   <option value="Allowance">Allowance</option>
+                  <option value="Fuel">Fuel</option>
                 </select>
               </div>
 
