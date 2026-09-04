@@ -167,7 +167,7 @@ router.post('/handovers/:id/resolve', authorizeRole('admin', 'accountant'), asyn
       const secondId = Math.max(parseInt(handover.from_vault_id, 10), parseInt(handover.to_vault_id, 10));
 
       await client.query('SELECT current_balance FROM cash_vaults WHERE vault_id = $1 FOR UPDATE', [firstId]);
-      await client.query('SELECT current_balance FROM cash_vaults WHERE vault_id = $2 FOR UPDATE', [secondId]);
+      await client.query('SELECT current_balance FROM cash_vaults WHERE vault_id = $1 FOR UPDATE', [secondId]);
 
       // Deduct from sender staff vault
       const deductQuery = await client.query(
