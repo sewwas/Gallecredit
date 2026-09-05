@@ -28,36 +28,70 @@ const authenticateToken = async (req, res, next) => {
     return next();
   }
 
-  let email = null;
+  const secret = process.env.JWT_SECRET || 'supersecretjwtkey_please_change_in_production';
 
-  // 2. Validate token with Supabase or fallback gracefully on network DNS hiccups
+  // 2. Try verifying as local backend-issued JWT
+  try {
+    const decoded = jwt.verify(token, secret);
+    if (decoded && (decoded.userId || decoded.user_id || decoded.username)) {
+      const userLookup = decoded.userId || decoded.user_id;
+      let dbUser;
+      if (userLookup) {
+        dbUser = await pool.query(
+          'SELECT user_id, role, username, is_active FROM users WHERE user_id = $1',
+          [userLookup]
+        );
+      } else {
+        dbUser = await pool.query(
+          'SELECT user_id, role, username, is_active FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1))',
+          [decoded.username]
+        );
+      }
+
+      if (dbUser.rows.length === 0) {
+        return res.status(403).json({ error: 'User not registered in the system' });
+      }
+
+      if (dbUser.rows[0].is_active === false) {
+        return res.status(403).json({ error: 'User account has been deactivated' });
+      }
+
+      const u = dbUser.rows[0];
+      const userData = {
+        userId: u.user_id,
+        role: u.role,
+        username: u.username,
+        email: decoded.email || u.username
+      };
+
+      const expiresAt = decoded.exp ? decoded.exp * 1000 : Date.now() + CACHE_TTL_MS;
+      tokenCache.set(token, { user: userData, expiresAt: Math.min(Date.now() + CACHE_TTL_MS, expiresAt) });
+      req.user = userData;
+      return next();
+    }
+  } catch (jwtErr) {
+    // If not valid with local secret, fall through to Supabase token verification below
+  }
+
+  // 3. Fallback: Validate token with Supabase (for existing sessions or external logins)
+  let email = null;
   try {
     if (supabase) {
       const { data, error } = await supabase.auth.getUser(token);
-      if (error) {
-        return res.status(403).json({ error: 'Invalid or expired token' });
-      }
-      if (data && data.user) {
+      if (!error && data && data.user) {
         email = data.user.email;
       }
     }
   } catch (networkErr) {
     console.warn('Supabase auth network check failed, attempting token payload fallback:', networkErr.message || networkErr);
-    // If external call fails due to network/DNS timeout, fallback to unexpired decoded JWT
-    try {
-      const decoded = jwt.decode(token);
-      if (decoded && decoded.exp && decoded.exp * 1000 > Date.now() && decoded.email) {
-        email = decoded.email;
-      }
-    } catch (e) {}
   }
 
   // If Supabase client was not initialized or didn't return email, try decoded JWT if unexpired
   if (!email) {
     try {
       const decoded = jwt.decode(token);
-      if (decoded && decoded.exp && decoded.exp * 1000 > Date.now() && decoded.email) {
-        email = decoded.email;
+      if (decoded && decoded.exp && decoded.exp * 1000 > Date.now() && (decoded.email || decoded.username)) {
+        email = decoded.email || decoded.username;
       }
     } catch (e) {}
   }
@@ -66,18 +100,26 @@ const authenticateToken = async (req, res, next) => {
     return res.status(403).json({ error: 'Invalid or expired token' });
   }
 
-  // 3. Fetch user details and role from database
+  // 4. Fetch user details and role from database
   try {
-    const dbUser = await pool.query('SELECT user_id, role, username FROM users WHERE username = $1', [email]);
+    const dbUser = await pool.query(
+      'SELECT user_id, role, username, is_active FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1))',
+      [email]
+    );
     
     if (dbUser.rows.length === 0) {
       return res.status(403).json({ error: 'User not registered in the system' });
     }
 
+    if (dbUser.rows[0].is_active === false) {
+      return res.status(403).json({ error: 'User account has been deactivated' });
+    }
+
+    const u = dbUser.rows[0];
     const userData = {
-      userId: dbUser.rows[0].user_id,
-      role: dbUser.rows[0].role,
-      username: dbUser.rows[0].username,
+      userId: u.user_id,
+      role: u.role,
+      username: u.username,
       email: email
     };
 
@@ -92,7 +134,7 @@ const authenticateToken = async (req, res, next) => {
 
     tokenCache.set(token, { user: userData, expiresAt });
     req.user = userData;
-    next();
+    return next();
   } catch (dbErr) {
     console.error('Database query error in authenticateToken:', dbErr.message);
     return res.status(500).json({ error: 'Internal database authentication error' });

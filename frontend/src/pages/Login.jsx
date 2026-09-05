@@ -89,14 +89,15 @@ const Login = () => {
         {!isResetMode ? (
           <form onSubmit={handleSubmit} className="space-y-4 text-left">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1">Username (Email)</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1">System Username or Email</label>
               <input
                 type="text"
                 required
                 className="premium-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="gallecredit@gmail.com"
+                placeholder="e.g. Rajith89 or gallecredit@gmail.com"
+                autoComplete="username"
               />
             </div>
             <div>

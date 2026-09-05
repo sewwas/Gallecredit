@@ -51,6 +51,9 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'All fields (name, role, username, password) are required.' });
   }
 
+  const trimmedName = name.toString().trim();
+  const trimmedUsername = username.toString().trim();
+
   if (password.length < 6) {
     return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
   }
@@ -61,10 +64,13 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    // Check if username is already taken
-    const userCheck = await pool.query('SELECT 1 FROM users WHERE username = $1', [username]);
+    // Check if username is already taken (case-insensitive)
+    const userCheck = await pool.query(
+      'SELECT 1 FROM users WHERE LOWER(TRIM(username)) = LOWER($1)',
+      [trimmedUsername]
+    );
     if (userCheck.rows.length > 0) {
-      return res.status(400).json({ error: `Username '${username}' is already registered.` });
+      return res.status(400).json({ error: `Username '${trimmedUsername}' is already registered.` });
     }
 
     // Hash the password using bcrypt
@@ -75,7 +81,7 @@ router.post('/', async (req, res) => {
       `INSERT INTO users (name, role, username, password_hash, is_active)
        VALUES ($1, $2, $3, $4, TRUE)
        RETURNING user_id, name, role, username, is_active`,
-      [name, role, username, passwordHash]
+      [trimmedName, role, trimmedUsername, passwordHash]
     );
 
     res.status(201).json(result.rows[0]);
@@ -93,6 +99,9 @@ router.put('/:id', async (req, res) => {
   if (!name || !role || !username) {
     return res.status(400).json({ error: 'Name, role, and username are required.' });
   }
+
+  const trimmedName = name.toString().trim();
+  const trimmedUsername = username.toString().trim();
 
   const validRoles = ['admin', 'accountant', 'staff'];
   if (!validRoles.includes(role)) {
@@ -124,14 +133,14 @@ router.put('/:id', async (req, res) => {
       }
     }
 
-    // 3. Prevent username collision
+    // 3. Prevent username collision (case-insensitive)
     const nameCollision = await client.query(
-      'SELECT 1 FROM users WHERE username = $1 AND user_id != $2',
-      [username, id]
+      'SELECT 1 FROM users WHERE LOWER(TRIM(username)) = LOWER($1) AND user_id != $2',
+      [trimmedUsername, id]
     );
     if (nameCollision.rows.length > 0) {
       await client.query('ROLLBACK');
-      return res.status(400).json({ error: `Username '${username}' is already taken by another account.` });
+      return res.status(400).json({ error: `Username '${trimmedUsername}' is already taken by another account.` });
     }
 
     let result;
@@ -151,7 +160,7 @@ router.put('/:id', async (req, res) => {
          SET name = $1, role = $2, username = $3, password_hash = $4, is_active = $5
          WHERE user_id = $6
          RETURNING user_id, name, role, username, is_active`,
-        [name, role, username, newHash, isActiveVal, id]
+        [trimmedName, role, trimmedUsername, newHash, isActiveVal, id]
       );
     } else {
       // Otherwise, update properties without modifying credentials
@@ -160,7 +169,7 @@ router.put('/:id', async (req, res) => {
          SET name = $1, role = $2, username = $3, is_active = $4
          WHERE user_id = $5
          RETURNING user_id, name, role, username, is_active`,
-        [name, role, username, isActiveVal, id]
+        [trimmedName, role, trimmedUsername, isActiveVal, id]
       );
     }
 

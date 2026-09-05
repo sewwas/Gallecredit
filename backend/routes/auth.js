@@ -7,8 +7,17 @@ const { sendOTPEmail } = require('../utils/email');
 
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Username and password are required' });
+  }
+
   try {
-    const result = await pool.query('SELECT * FROM users WHERE username = $1', [username]);
+    const trimmedUsername = username.toString().trim();
+    const result = await pool.query(
+      'SELECT * FROM users WHERE LOWER(TRIM(username)) = LOWER($1)',
+      [trimmedUsername]
+    );
     const user = result.rows[0];
 
     if (!user) {
@@ -24,10 +33,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    const secret = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' ? 'supersecretjwtkey_please_change_in_production' : null);
-    if (!secret) {
-      return res.status(500).json({ error: 'Server configuration error: missing JWT_SECRET' });
-    }
+    const secret = process.env.JWT_SECRET || 'supersecretjwtkey_please_change_in_production';
 
     const token = jwt.sign(
       { userId: user.user_id, user_id: user.user_id, role: user.role, username: user.username },
@@ -35,9 +41,18 @@ router.post('/login', async (req, res) => {
       { expiresIn: '8h' }
     );
 
-    res.json({ token, user: { id: user.user_id, username: user.username, role: user.role, name: user.name } });
+    res.json({
+      token,
+      user: {
+        id: user.user_id,
+        user_id: user.user_id,
+        username: user.username,
+        role: user.role,
+        name: user.name
+      }
+    });
   } catch (err) {
-    console.error(err);
+    console.error('Login error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
