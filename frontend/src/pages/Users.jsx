@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { ShieldAlert, UserPlus, Edit2, Shield, UserCheck, RefreshCw, X, Check, Power, Wallet } from 'lucide-react';
+import { ShieldAlert, UserPlus, Edit2, Shield, UserCheck, RefreshCw, X, Check, Power, Wallet, Trash2 } from 'lucide-react';
 
 const Users = () => {
   const { user } = useAuth();
@@ -27,6 +27,9 @@ const Users = () => {
   // Modals state
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [showPayModal, setShowPayModal] = useState(false);
   const [payUser, setPayUser] = useState(null);
@@ -172,6 +175,35 @@ const Users = () => {
     }
   };
 
+  const handleOpenDeleteModal = (targetUser) => {
+    setUserToDelete(targetUser);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!userToDelete || isDeleting) return;
+    setIsDeleting(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const config = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+      const res = await axios.delete(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/users/${userToDelete.user_id}?permanent=true`,
+        config
+      );
+      setSuccessMsg(res.data.message || `Account '${userToDelete.username}' deleted successfully.`);
+      setShowDeleteModal(false);
+      setUserToDelete(null);
+      fetchUsers();
+    } catch (err) {
+      console.error('Delete user error:', err);
+      setErrorMsg(err.response?.data?.error || 'Failed to delete account');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -307,11 +339,22 @@ const Users = () => {
                     disabled={isCurrentUser}
                     className={`p-2 rounded-xl border transition-colors ${
                       isCurrentUser ? 'opacity-40 cursor-not-allowed text-slate-300 border-slate-100' :
-                      u.is_active ? 'hover:bg-red-50 text-red-500 border-red-100' : 'hover:bg-green-50 text-green-550 border-green-100'
+                      u.is_active ? 'hover:bg-amber-50 text-amber-500 border-amber-100' : 'hover:bg-green-50 text-green-550 border-green-100'
                     }`}
                     title={u.is_active ? 'Deactivate Account' : 'Activate Account'}
                   >
                     <Power className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleOpenDeleteModal(u)}
+                    disabled={isCurrentUser}
+                    className={`p-2 rounded-xl border transition-colors ${
+                      isCurrentUser ? 'opacity-40 cursor-not-allowed text-slate-300 border-slate-100' :
+                      'hover:bg-rose-50 text-rose-500 border-rose-100 hover:border-rose-200'
+                    }`}
+                    title={isCurrentUser ? 'You cannot delete your own active account' : 'Permanently Delete Account'}
+                  >
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
@@ -549,6 +592,76 @@ const Users = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Modal */}
+      {showDeleteModal && userToDelete && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300 border border-slate-200">
+            <div className="px-6 py-5 border-b border-slate-100 flex justify-between items-center bg-rose-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center font-bold">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Delete Account</h3>
+                  <p className="text-xs text-rose-600 font-semibold">Permanent Deletion</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { if (!isDeleting) { setShowDeleteModal(false); setUserToDelete(null); } }} 
+                className="text-slate-400 hover:text-slate-600 transition-colors p-2 hover:bg-slate-100 rounded-full"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">
+                Are you sure you want to permanently delete account <strong className="text-slate-900">{userToDelete.name}</strong> (<span className="text-slate-500 font-mono">@{userToDelete.username}</span>)?
+              </p>
+
+              {userToDelete.role === 'admin' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 text-xs flex items-start gap-2">
+                  <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Administrator Account:</strong> This user has full system administrative privileges. If this admin account is no longer needed, you can delete it as long as another active Administrator exists.
+                  </span>
+                </div>
+              )}
+
+              <p className="text-xs text-slate-400 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                Historical records associated with this employee (loans, receipts, and audit logs) will be safely retained in the database.
+              </p>
+
+              <div className="pt-2 flex gap-3">
+                <button 
+                  type="button" 
+                  onClick={() => { setShowDeleteModal(false); setUserToDelete(null); }} 
+                  className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 rounded-xl transition-all text-sm" 
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="button" 
+                  onClick={handleConfirmDelete} 
+                  className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20" 
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    'Delete Account'
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -38,7 +38,18 @@ const auditLog = async (req, res, next) => {
           action === 'PUT' ? 'Updated record' : null, // Simplification: we'd need a separate query for true old_value
           JSON.stringify(req.body)
         ]
-      ).catch(err => console.error('Audit Log Error:', err));
+      ).catch(async (err) => {
+        if (err.code === '23503' && err.constraint === 'audit_logs_user_id_fkey') {
+          try {
+            await pool.query(
+              'INSERT INTO audit_logs (user_id, action, table_name, record_id, old_value, new_value) VALUES (NULL, $1, $2, $3, $4, $5)',
+              [action, tableName, recordId, action === 'PUT' ? 'Updated record' : null, JSON.stringify(req.body)]
+            );
+          } catch (retryErr) {}
+        } else {
+          console.error('Audit Log Error:', err);
+        }
+      });
 
       return originalSend.apply(res, arguments);
     };
@@ -66,7 +77,18 @@ const auditReportView = (reportName) => async (req, res, next) => {
         null,
         JSON.stringify({ report: reportName, query: req.query })
       ]
-    ).catch(err => console.error('Audit Report Log Error:', err));
+    ).catch(async (err) => {
+      if (err.code === '23503' && err.constraint === 'audit_logs_user_id_fkey') {
+        try {
+          await pool.query(
+            'INSERT INTO audit_logs (user_id, action, table_name, record_id, old_value, new_value) VALUES (NULL, $1, $2, $3, $4, $5)',
+            ['VIEW', 'reports', null, null, JSON.stringify({ report: reportName, query: req.query })]
+          );
+        } catch (retryErr) {}
+      } else {
+        console.error('Audit Report Log Error:', err);
+      }
+    });
   } catch (err) {
     console.error('Audit Report Middleware Error:', err);
   }

@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcrypt');
 const { pool } = require('../db');
-const { authenticateToken, authorizeRole } = require('../middleware/auth');
+const { authenticateToken, authorizeRole, invalidateUserCache } = require('../middleware/auth');
 
 // Secure all user routes
 router.use(authenticateToken);
@@ -184,8 +184,80 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// 4. DELETE /:id - Soft-deactivate/toggle user status
+// Helper for permanent user deletion
+const handlePermanentDelete = async (req, res, id) => {
+  const currentUserId = req.user ? (req.user.userId || req.user.user_id) : null;
+  const targetId = parseInt(id, 10);
+
+  if (isNaN(targetId)) {
+    return res.status(400).json({ error: 'Invalid user ID' });
+  }
+
+  // 1. Prevent deleting currently logged-in account
+  if (currentUserId && Number(currentUserId) === targetId) {
+    return res.status(400).json({ error: 'Security Protection: You cannot delete your own active administrator account while logged in.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const userQuery = await client.query('SELECT user_id, name, role, username, is_active FROM users WHERE user_id = $1', [targetId]);
+    if (userQuery.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const targetUser = userQuery.rows[0];
+
+    // 2. Prevent deleting the last remaining active admin
+    if (targetUser.role === 'admin') {
+      const adminCountQuery = await client.query(
+        "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = TRUE AND user_id != $1",
+        [targetId]
+      );
+      const remainingActiveAdmins = parseInt(adminCountQuery.rows[0].count, 10);
+      if (remainingActiveAdmins < 1) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Security Lockout: Cannot delete the last remaining active Administrator.' });
+      }
+    }
+
+    // 3. Delete user permanently (Foreign keys have ON DELETE SET NULL)
+    await client.query('DELETE FROM users WHERE user_id = $1', [targetId]);
+
+    await client.query('COMMIT');
+
+    // Invalidate cached auth sessions for deleted user
+    if (typeof invalidateUserCache === 'function') {
+      invalidateUserCache(targetId);
+    }
+
+    return res.json({ 
+      success: true,
+      message: `Account '${targetUser.username}' (${targetUser.name}) has been permanently deleted.`,
+      deletedUser: targetUser
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Failed to permanently delete user:', err);
+    return res.status(500).json({ error: 'Internal server error while deleting user' });
+  } finally {
+    client.release();
+  }
+};
+
+// 4. DELETE /:id/permanent - Permanently delete a user account
+router.delete('/:id/permanent', async (req, res) => {
+  return handlePermanentDelete(req, res, req.params.id);
+});
+
+// 5. DELETE /:id - Either permanent delete (if ?permanent=true) or toggle status (soft deactivate)
 router.delete('/:id', async (req, res) => {
+  if (req.query.permanent === 'true' || req.body?.permanent === true) {
+    return handlePermanentDelete(req, res, req.params.id);
+  }
+
   const { id } = req.params;
   const client = await pool.connect();
 
@@ -220,6 +292,12 @@ router.delete('/:id', async (req, res) => {
     );
 
     await client.query('COMMIT');
+
+    // Invalidate cached auth sessions if deactivated
+    if (!newStatus && typeof invalidateUserCache === 'function') {
+      invalidateUserCache(id);
+    }
+
     res.json({ message: `User status successfully toggled to ${newStatus ? 'Active' : 'Deactivated'}`, user: result.rows[0] });
   } catch (err) {
     await client.query('ROLLBACK');

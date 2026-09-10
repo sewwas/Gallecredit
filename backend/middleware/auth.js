@@ -6,6 +6,16 @@ const { pool } = require('../db');
 const tokenCache = new Map();
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+const invalidateUserCache = (userId) => {
+  if (!userId) return;
+  const targetId = Number(userId);
+  for (const [token, entry] of tokenCache.entries()) {
+    if (Number(entry.user?.userId || entry.user?.user_id) === targetId) {
+      tokenCache.delete(token);
+    }
+  }
+};
+
 setInterval(() => {
   const now = Date.now();
   for (const [token, entry] of tokenCache.entries()) {
@@ -150,4 +160,4 @@ const authorizeRole = (...allowedRoles) => {
   };
 };
 
-module.exports = { authenticateToken, authorizeRole };
+module.exports = { authenticateToken, authorizeRole, invalidateUserCache };
