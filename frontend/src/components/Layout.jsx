@@ -15,7 +15,8 @@ import {
   Menu,
   X,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Smartphone
 } from 'lucide-react';
 
 const Layout = () => {
@@ -55,6 +56,9 @@ const Layout = () => {
     navItems.push({ name: 'Holidays', path: '/holidays', icon: Calendar });
     navItems.push({ name: 'User Manager', path: '/users', icon: Users });
   }
+
+  // Universal Field Mobile Mode for all roles (Staff, Admin, Accountant)
+  navItems.push({ name: 'Field Mobile Mode', path: '/collector', icon: Smartphone });
 
   return (
     <div className="flex h-screen bg-slate-50/50 overflow-hidden relative">
@@ -200,7 +204,17 @@ const Layout = () => {
               </h1>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <Link
+                to="/collector"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm shadow-emerald-600/20 transition-all active:scale-95"
+                title="Switch to Mobile Field Mode & Loan Calculator"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Field Mobile Mode</span>
+                <span className="sm:hidden">Field App</span>
+              </Link>
+
               {/* Alerts notifications bell */}
               <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center shadow-sm text-slate-600 hover:text-primary-600 transition-colors cursor-pointer">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H6" /></svg>

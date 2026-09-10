@@ -14,12 +14,28 @@ import Holidays from './pages/Holidays';
 import PortfolioRisk from './pages/PortfolioRisk';
 import Users from './pages/Users';
 
+// Dedicated Mobile Field Collector & Calculator Portal
+import CollectorLayout from './components/CollectorLayout';
+import CollectorRoute from './pages/collector/CollectorRoute';
+import FieldCalculator from './pages/collector/FieldCalculator';
+import CollectorDrawer from './pages/collector/CollectorDrawer';
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+
+          {/* Universal Mobile Field Collector & Loan Calculator PWA Portal */}
+          <Route path="/collector" element={<CollectorLayout />}>
+            <Route index element={<CollectorRoute />} />
+            <Route path="route" element={<CollectorRoute />} />
+            <Route path="calculator" element={<FieldCalculator />} />
+            <Route path="drawer" element={<CollectorDrawer />} />
+          </Route>
+
+          {/* Standard Desktop / Management Office Layout */}
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="customers" element={<Customers />} />

@@ -245,4 +245,110 @@ router.post('/', dayCloseGuard, async (req, res) => {
   }
 });
 
+// GET /api/payments/collector-route
+// Returns active loans with current/next pending installment for mobile field sheet
+router.get('/collector-route', async (req, res) => {
+  try {
+    const { collector_id, location } = req.query;
+
+    let filterClause = "WHERE l.status = 'disbursed'";
+    const params = [];
+
+    if (collector_id && collector_id !== 'all') {
+      params.push(parseInt(collector_id, 10));
+      filterClause += ` AND l.created_by_id = $${params.length}`;
+    }
+
+    if (location && location !== 'all') {
+      params.push(location);
+      filterClause += ` AND c.location = $${params.length}`;
+    }
+
+    const query = `
+      WITH next_installment AS (
+        SELECT DISTINCT ON (loan_id)
+          installment_id,
+          loan_id,
+          due_date,
+          amount,
+          paid_amount,
+          (amount - paid_amount) as remaining_installment,
+          status,
+          CASE 
+            WHEN due_date < CURRENT_DATE THEN 'overdue'
+            WHEN due_date = CURRENT_DATE THEN 'due_today'
+            ELSE 'upcoming'
+          END as due_urgency
+        FROM installments
+        WHERE status != 'paid'
+        ORDER BY loan_id, due_date ASC, installment_id ASC
+      ),
+      loan_summary AS (
+        SELECT 
+          loan_id,
+          SUM(amount) as total_loan_due,
+          SUM(paid_amount) as total_loan_paid,
+          SUM(amount - paid_amount) as total_remaining_balance
+        FROM installments
+        GROUP BY loan_id
+      ),
+      today_collections AS (
+        SELECT 
+          loan_id,
+          SUM(amount) as paid_today
+        FROM payments
+        WHERE DATE(payment_date) = CURRENT_DATE
+        GROUP BY loan_id
+      )
+      SELECT 
+        l.loan_id,
+        l.loan_code,
+        l.loan_amount,
+        l.loan_type,
+        l.status as loan_status,
+        c.customer_id,
+        c.name as customer_name,
+        c.phone as customer_phone,
+        c.nic as customer_nic,
+        c.address as customer_address,
+        c.location as customer_location,
+        c.location_code as customer_location_code,
+        ni.installment_id,
+        ni.due_date as installment_due_date,
+        ni.amount as installment_amount,
+        ni.paid_amount as installment_paid_amount,
+        ni.remaining_installment,
+        ni.status as installment_status,
+        COALESCE(ni.due_urgency, 'completed') as due_urgency,
+        COALESCE(ls.total_remaining_balance, 0) as total_remaining_balance,
+        COALESCE(tc.paid_today, 0) as paid_today,
+        u.name as collector_name,
+        l.created_by_id as collector_id
+      FROM loans l
+      JOIN customers c ON l.customer_id = c.customer_id
+      LEFT JOIN next_installment ni ON l.loan_id = ni.loan_id
+      LEFT JOIN loan_summary ls ON l.loan_id = ls.loan_id
+      LEFT JOIN today_collections tc ON l.loan_id = tc.loan_id
+      LEFT JOIN users u ON l.created_by_id = u.user_id
+      ${filterClause}
+      ORDER BY 
+        CASE 
+          WHEN COALESCE(tc.paid_today, 0) > 0 THEN 3
+          WHEN ni.due_urgency = 'overdue' THEN 1
+          WHEN ni.due_urgency = 'due_today' THEN 2
+          ELSE 4
+        END,
+        ni.due_date ASC NULLS LAST,
+        c.name ASC
+    `;
+
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching collector route:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
+
