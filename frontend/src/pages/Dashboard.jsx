@@ -26,7 +26,7 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         const [customersRes, loansRes, dailyRes, outRes, trendsRes, distRes, profitRes, expenseRes] = await Promise.all([
-          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`),
+          axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`).catch(() => ({ data: [] })),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/loans`).catch(() => ({ data: [] })),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/daily-collection`).catch(() => ({ data: { total_collection: 0 } })),
           axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/reports/outstanding`).catch(() => ({ data: [] })),

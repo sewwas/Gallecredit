@@ -43,7 +43,12 @@ const CollectorRoute = () => {
         config.params.collector_id = user.userId;
       }
 
-      const res = await axios.get(`${API_URL}/api/payments/collector-route`, config);
+      let res = await axios.get(`${API_URL}/api/payments/collector-route`, config);
+      if (Array.isArray(res.data) && res.data.length === 0 && user.role === 'staff' && config.params.collector_id) {
+        // Fallback: If no loans were registered under this specific staff collector, show all active routes
+        delete config.params.collector_id;
+        res = await axios.get(`${API_URL}/api/payments/collector-route`, config);
+      }
       if (Array.isArray(res.data)) {
         setRouteItems(res.data);
       }

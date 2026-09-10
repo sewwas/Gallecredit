@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit2, Trash2, CheckCircle, Clock, AlertCircle, User } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, Clock, AlertCircle, User, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import CustomerAuditModal from '../components/CustomerAuditModal';
 
@@ -31,6 +31,7 @@ const Customers = () => {
     application_id: ''
   });
   const [error, setError] = useState('');
+  const [fetchError, setFetchError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewingDocs, setViewingDocs] = useState(false);
@@ -40,6 +41,11 @@ const Customers = () => {
   const [isCustomLoc, setIsCustomLoc] = useState(false);
   const [auditCustomerId, setAuditCustomerId] = useState(null);
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
   useEffect(() => {
     if (viewingDocs && selectedCustomerId) {
       fetchDocs();
@@ -48,10 +54,13 @@ const Customers = () => {
 
   const fetchDocs = async () => {
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`);
-      setDocs(res.data);
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`,
+        { headers: getAuthHeaders() }
+      );
+      setDocs(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load documents:', err);
     }
   };
 
@@ -68,28 +77,43 @@ const Customers = () => {
 
     setUploading(true);
     try {
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`, formDataObj);
+      await axios.post(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}/documents`,
+        formDataObj,
+        { headers: getAuthHeaders() }
+      );
       fetchDocs();
     } catch (err) {
-      alert('Upload failed');
+      alert('Upload failed: ' + (err.response?.data?.error || err.message));
     } finally {
       setUploading(false);
     }
   };
 
   const filteredCustomers = customers.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          c.nic.toLowerCase().includes(searchTerm.toLowerCase());
+    const q = searchTerm.toLowerCase().trim();
+    const matchesSearch = !q ||
+      (c.name || '').toLowerCase().includes(q) || 
+      (c.nic || '').toLowerCase().includes(q) ||
+      (c.phone || '').toLowerCase().includes(q) ||
+      (c.application_id || '').toLowerCase().includes(q);
     const matchesStatus = filterStatus === 'all' || c.kyc_status === filterStatus;
     return matchesSearch && matchesStatus;
   });
 
   const fetchCustomers = async () => {
+    setLoading(true);
+    setFetchError('');
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`);
+      const res = await axios.get(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`,
+        { headers: getAuthHeaders() }
+      );
       setCustomers(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch customers:', err);
+      const msg = err.response?.data?.error || err.message || 'Failed to load customers';
+      setFetchError(msg);
     } finally {
       setLoading(false);
     }
@@ -124,10 +148,11 @@ const Customers = () => {
     setIsSubmitting(true);
     setError('');
     try {
+      const config = { headers: getAuthHeaders() };
       if (editMode) {
-        await axios.put(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}`, formData);
+        await axios.put(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers/${selectedCustomerId}`, formData, config);
       } else {
-        await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`, formData);
+        await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/customers`, formData, config);
       }
       closeModal();
       fetchCustomers();
@@ -192,19 +217,48 @@ const Customers = () => {
           <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Customers</h2>
           <p className="text-sm text-slate-500 font-medium mt-1">Manage your customer database and KYC status</p>
         </div>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="premium-btn"
-        >
-          <Plus className="w-5 h-5" /> Add Customer
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={fetchCustomers}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 font-semibold text-sm transition-all shadow-xs"
+            title="Refresh customer list"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-primary-500' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+          <button 
+            onClick={() => setShowModal(true)}
+            className="premium-btn"
+          >
+            <Plus className="w-5 h-5" /> Add Customer
+          </button>
+        </div>
       </div>
+
+      {fetchError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-5 py-4 rounded-2xl flex items-center justify-between animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
+            <div>
+              <p className="text-sm font-bold">Failed to load customers</p>
+              <p className="text-xs text-red-600 mt-0.5">{fetchError}</p>
+            </div>
+          </div>
+          <button 
+            onClick={fetchCustomers}
+            className="text-xs bg-red-600 text-white font-bold px-3.5 py-1.5 rounded-xl hover:bg-red-700 transition-colors shadow-xs"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-4">
         <div className="flex-1">
           <input 
             type="text" 
-            placeholder="Search by Name or NIC..." 
+            placeholder="Search by Name, NIC, Phone, or App ID..." 
             className="premium-input"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -287,7 +341,11 @@ const Customers = () => {
                 ))}
                 {filteredCustomers.length === 0 && (
                   <tr>
-                    <td colSpan="7" className="py-12 text-center text-slate-400 font-medium">No customers found matching your criteria.</td>
+                    <td colSpan="7" className="py-12 text-center text-slate-400 font-medium">
+                      {customers.length === 0 
+                        ? (fetchError ? "Could not retrieve customers. Please check connection and try again." : "No customers registered yet. Click '+ Add Customer' to register your first customer.")
+                        : `No customers found matching "${searchTerm || filterStatus}".`}
+                    </td>
                   </tr>
                 )}
               </tbody>

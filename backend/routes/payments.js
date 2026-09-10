@@ -256,7 +256,7 @@ router.get('/collector-route', async (req, res) => {
 
     if (collector_id && collector_id !== 'all') {
       params.push(parseInt(collector_id, 10));
-      filterClause += ` AND l.created_by_id = $${params.length}`;
+      filterClause += ` AND (l.created_by_id = $${params.length} OR l.disbursed_by_id = $${params.length})`;
     }
 
     if (location && location !== 'all') {

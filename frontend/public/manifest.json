@@ -1,13 +1,15 @@
 {
+  "id": "/?source=pwa",
   "name": "Galle Credit - Field Collection & MMS",
   "short_name": "GalleCredit",
   "description": "Enterprise Microfinance System & Mobile Field Collection App",
-  "start_url": "/",
+  "start_url": "/collector",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f172a",
   "theme_color": "#0f172a",
+  "categories": ["finance", "business", "productivity"],
   "icons": [
     {
       "src": "/logo.jpg",

@@ -9,13 +9,16 @@ import {
   WifiOff, 
   LogOut, 
   Zap,
-  RotateCcw
+  RotateCcw,
+  Download
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { usePWA } from '../context/PWAContext';
 import { getOfflineQueue, getOfflineDrawerTally, syncOfflinePayments } from '../utils/offlineQueue';
 
 const CollectorLayout = () => {
   const { user, logout } = useAuth();
+  const { isInstalled, triggerInstall } = usePWA();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -124,10 +127,26 @@ const CollectorLayout = () => {
               )}
             </div>
 
+            {/* Install / Download PWA Button */}
+            {!isInstalled && (
+              <button
+                type="button"
+                onClick={triggerInstall}
+                className="p-1.5 px-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white transition-all flex items-center gap-1 text-xs font-bold shadow-xs active:scale-95 border border-emerald-500/30"
+                title="Download / Install PWA App"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="text-[10px] hidden xs:inline">Install</span>
+              </button>
+            )}
+
             {/* Switch to Desktop Button */}
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => {
+                sessionStorage.setItem('prefers-desktop', 'true');
+                navigate('/');
+              }}
               className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-colors flex items-center gap-1 text-xs font-semibold active:scale-95"
               title="Switch to Full Desktop View"
             >

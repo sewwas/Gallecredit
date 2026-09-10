@@ -29,6 +29,17 @@ const Layout = () => {
     return <Navigate to="/login" />;
   }
 
+  // Automatic Mobile Redirection: Auto-route mobile devices directly to Field Mobile Mode (/collector)
+  const prefersDesktop = sessionStorage.getItem('prefers-desktop') === 'true';
+  const isMobile = typeof window !== 'undefined' && (
+    window.innerWidth <= 768 || 
+    /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+  );
+
+  if (isMobile && !prefersDesktop && !location.pathname.startsWith('/collector')) {
+    return <Navigate to="/collector" replace />;
+  }
+
   if (user.role === 'staff' && location.pathname === '/') {
     return <Navigate to="/payments" replace />;
   }
@@ -207,12 +218,12 @@ const Layout = () => {
             <div className="flex items-center gap-3">
               <Link
                 to="/collector"
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm shadow-emerald-600/20 transition-all active:scale-95"
+                onClick={() => sessionStorage.removeItem('prefers-desktop')}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-sm shadow-emerald-600/20 transition-all active:scale-95"
                 title="Switch to Mobile Field Mode & Loan Calculator"
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Field Mobile Mode</span>
-                <span className="sm:hidden">Field App</span>
+                <span>Field Mobile Mode</span>
               </Link>
 
               {/* Alerts notifications bell */}

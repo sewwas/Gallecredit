@@ -17,7 +17,15 @@ const Login = () => {
   const navigate = useNavigate();
 
   if (user) {
-    return <Navigate to={user.role === 'staff' ? '/payments' : '/'} />;
+    const prefersDesktop = sessionStorage.getItem('prefers-desktop') === 'true';
+    const isMobile = typeof window !== 'undefined' && (
+      window.innerWidth <= 768 || 
+      /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+    );
+    if (isMobile && !prefersDesktop) {
+      return <Navigate to="/collector" replace />;
+    }
+    return <Navigate to={user.role === 'staff' ? '/payments' : '/'} replace />;
   }
 
   const handleSubmit = async (e) => {
