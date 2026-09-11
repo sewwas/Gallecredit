@@ -17,16 +17,26 @@ axios.interceptors.request.use(
 );
 
 
-// Register Service Worker for PWA
+// Register Service Worker for PWA (Production only; clean up in development)
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((reg) => {
-      console.log('PWA Service Worker registered:', reg.scope);
-      reg.update();
-    }).catch((err) => {
-      console.warn('PWA Service Worker registration failed:', err);
+  if (import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('PWA Service Worker registered:', reg.scope);
+        reg.update();
+      }).catch((err) => {
+        console.warn('PWA Service Worker registration failed:', err);
+      });
     });
-  });
+  } else {
+    // In local development, unregister any lingering service workers on localhost to avoid caching collisions
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const registration of registrations) {
+        registration.unregister();
+        console.log('[Dev] Unregistered lingering Service Worker:', registration.scope);
+      }
+    });
+  }
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(

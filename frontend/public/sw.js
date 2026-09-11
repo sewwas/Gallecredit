@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gallecredit-cache-v2';
+const CACHE_NAME = 'gallecredit-cache-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -67,14 +67,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigation requests (SPA page routes like /vaults, /collector, /loans):
-  // Network first; if 404 or offline, serve index.html from cache or fallback response
-  if (event.request.mode === 'navigate') {
+  // 2. Navigation & SPA page routes (e.g. /vaults, /collector, /loans, /customers):
+  // Detect document navigation, Accept: text/html, or any extensionless path
+  const isSpaNavigation =
+    event.request.mode === 'navigate' ||
+    event.request.headers.get('accept')?.includes('text/html') ||
+    (isSameOrigin && !url.pathname.includes('.') && !url.pathname.startsWith('/api/'));
+
+  if (isSpaNavigation) {
     event.respondWith(
       (async () => {
         try {
           const networkResponse = await fetch(event.request);
-          // If server responded with 404 for a deep SPA route, fallback to index.html
+          // If the network response was OK, return it
+          if (networkResponse && networkResponse.status === 200) {
+            return networkResponse;
+          }
+          // If server responded with 404 (direct deep-link before server rewrite), fallback to index.html
           if (networkResponse && networkResponse.status === 404) {
             const cachedIndex = await caches.match('/index.html') || await caches.match('/');
             if (cachedIndex) {
@@ -85,16 +94,16 @@ self.addEventListener('fetch', (event) => {
             return networkResponse;
           }
         } catch (err) {
-          console.warn('[SW] Navigation fetch failed, falling back to cache:', err);
+          console.warn('[SW] SPA navigation network fetch failed, trying cache:', err);
         }
 
-        // Offline / network failure: return cached app shell
+        // Offline or network failure: return cached app shell
         const cached = await caches.match('/index.html') || await caches.match('/');
         if (cached) {
           return cached;
         }
 
-        // Fallback response: ensure event.respondWith never resolves to undefined or rejects
+        // Guaranteed Response fallback: ensure event.respondWith never resolves to undefined or throws
         return new Response(
           '<!doctype html><html><head><meta charset="utf-8"><title>Offline - Galle Credit</title><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="font-family:sans-serif;text-align:center;padding:50px 20px;background:#0f172a;color:#f8fafc;"><h2>You are currently offline</h2><p>Please check your internet connection and reload.</p><button onclick="window.location.reload()" style="background:#2563eb;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-weight:bold;margin-top:16px;">Retry</button></body></html>',
           {
@@ -108,7 +117,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Static assets on the same origin: Stale-while-revalidate with guaranteed response
+  // 3. Static assets on the same origin (e.g. .js, .css, images, fonts): Stale-while-revalidate
   if (isSameOrigin) {
     event.respondWith(
       (async () => {
