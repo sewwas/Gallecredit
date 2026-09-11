@@ -103,6 +103,144 @@ router.post('/close', async (req, res) => {
   }
 });
 
+// POST /capital/inflow - Record capital injected by investors/owners
+router.post('/capital/inflow', async (req, res) => {
+  const { date, source, amount, description } = req.body;
+  const numAmount = parseFloat(amount);
+  if (!numAmount || numAmount <= 0) {
+    return res.status(400).json({ error: 'Valid positive amount is required' });
+  }
+
+  const userId = req.user ? (req.user.user_id || req.user.userId) : null;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Lock and update Central Branch Safe (type = 'MAIN')
+    let mainVaultQuery = await client.query("SELECT vault_id, current_balance FROM cash_vaults WHERE type = 'MAIN' LIMIT 1 FOR UPDATE");
+    if (mainVaultQuery.rows.length === 0) {
+      const createRes = await client.query(
+        "INSERT INTO cash_vaults (name, type, current_balance) VALUES ('Central Branch Safe', 'MAIN', 0.00) RETURNING vault_id, current_balance"
+      );
+      mainVaultQuery = createRes;
+    }
+    const mainVaultId = mainVaultQuery.rows[0].vault_id;
+
+    await client.query(
+      "UPDATE cash_vaults SET current_balance = current_balance + $1 WHERE vault_id = $2",
+      [numAmount, mainVaultId]
+    );
+
+    // 2. Update cash_book with running balance calculation
+    const lastCashBookQuery = await client.query('SELECT balance_after FROM cash_book ORDER BY transaction_id DESC LIMIT 1 FOR UPDATE');
+    const lastBalance = lastCashBookQuery.rows.length > 0 ? parseFloat(lastCashBookQuery.rows[0].balance_after || 0) : 0;
+    const newBalance = lastBalance + numAmount;
+
+    const cashBookRes = await client.query(
+      `INSERT INTO cash_book (date, type, amount, source, reference_id, balance_after) 
+       VALUES ($1, 'IN', $2, $3, $4, $5) RETURNING transaction_id`,
+      [date ? new Date(date) : new Date(), numAmount, source ? `capital_inflow: ${source}` : 'capital_inflow', mainVaultId, newBalance]
+    );
+
+    // 3. Post Double-Entry Journal Entry
+    try {
+      const { postJournalEntry } = require('../utils/ledger');
+      await postJournalEntry(client, {
+        reference_source: 'capital_inflow',
+        reference_id: cashBookRes.rows[0]?.transaction_id || mainVaultId,
+        description: description || `Capital Inflow from ${source || 'Investor/Owner'}`,
+        created_by: userId,
+        lines: [
+          { account_code: '1100', debit: numAmount, credit: 0 },  // Debit Branch Safe Cash
+          { account_code: '3000', debit: 0, credit: numAmount }   // Credit Equity
+        ]
+      });
+    } catch (ledgerErr) {
+      console.error('Ledger capital inflow post failed:', ledgerErr.message);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, message: 'Capital Inflow recorded successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Capital inflow failed:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// POST /capital/distribution - Record profit/capital distributed to owners
+router.post('/capital/distribution', async (req, res) => {
+  const { date, destination, amount, description } = req.body;
+  const numAmount = parseFloat(amount);
+  if (!numAmount || numAmount <= 0) {
+    return res.status(400).json({ error: 'Valid positive amount is required' });
+  }
+
+  const userId = req.user ? (req.user.user_id || req.user.userId) : null;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // 1. Lock and check Central Branch Safe (type = 'MAIN')
+    const mainVaultQuery = await client.query("SELECT vault_id, current_balance FROM cash_vaults WHERE type = 'MAIN' LIMIT 1 FOR UPDATE");
+    if (mainVaultQuery.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(500).json({ error: 'Central branch safe vault not found' });
+    }
+    const mainVault = mainVaultQuery.rows[0];
+    if (parseFloat(mainVault.current_balance || 0) < numAmount) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Insufficient funds in Central Branch Safe' });
+    }
+
+    await client.query(
+      "UPDATE cash_vaults SET current_balance = current_balance - $1 WHERE vault_id = $2",
+      [numAmount, mainVault.vault_id]
+    );
+
+    // 2. Update cash_book with running balance calculation
+    const lastCashBookQuery = await client.query('SELECT balance_after FROM cash_book ORDER BY transaction_id DESC LIMIT 1 FOR UPDATE');
+    const lastBalance = lastCashBookQuery.rows.length > 0 ? parseFloat(lastCashBookQuery.rows[0].balance_after || 0) : 0;
+    const newBalance = lastBalance - numAmount;
+
+    const cashBookRes = await client.query(
+      `INSERT INTO cash_book (date, type, amount, source, reference_id, balance_after) 
+       VALUES ($1, 'OUT', $2, $3, $4, $5) RETURNING transaction_id`,
+      [date ? new Date(date) : new Date(), numAmount, destination ? `profit_distribution: ${destination}` : 'profit_distribution', mainVault.vault_id, newBalance]
+    );
+
+    // 3. Post Double-Entry Journal Entry
+    try {
+      const { postJournalEntry } = require('../utils/ledger');
+      await postJournalEntry(client, {
+        reference_source: 'capital_distribution',
+        reference_id: cashBookRes.rows[0]?.transaction_id || mainVault.vault_id,
+        description: description || `Profit/Capital Distribution to ${destination || 'Stakeholders'}`,
+        created_by: userId,
+        lines: [
+          { account_code: '3000', debit: numAmount, credit: 0 },  // Debit Equity
+          { account_code: '1100', debit: 0, credit: numAmount }   // Credit Branch Safe Cash
+        ]
+      });
+    } catch (ledgerErr) {
+      console.error('Ledger profit distribution post failed:', ledgerErr.message);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ success: true, message: 'Profit Distribution recorded successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Capital distribution failed:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
 // GET /accounts - List Chart of Accounts
 router.get('/accounts', async (req, res) => {
   try {
